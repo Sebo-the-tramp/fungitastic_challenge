@@ -28,14 +28,22 @@ def seed_everything(seed: int) -> None:
 def load_shards(data_path: Path) -> dict[str, torch.Tensor | None]:
     labels = []
     cls_tokens = []
+    register_tokens = []
     mean_pooled_patch_tokens = []
     mean_pooled_masked_patch_tokens = []
     patch_features = []
+    has_register_tokens = None
 
     for shard_path in tqdm(sorted(data_path.glob("*.pt")), desc=f"Loading {data_path.name}", unit="shard"):
-        shard_data = torch.load(shard_path)
+        shard_data = torch.load(shard_path, map_location="cpu")
         labels.extend(shard_data["labels"])
         cls_tokens.append(shard_data["cls_token"].float())
+        shard_register_tokens = shard_data["register_tokens"]
+        if has_register_tokens is None:
+            has_register_tokens = shard_register_tokens is not None
+        assert has_register_tokens == (shard_register_tokens is not None)
+        if shard_register_tokens is not None:
+            register_tokens.append(shard_register_tokens.flatten(1).float())
         mean_pooled_patch_tokens.append(shard_data["mean_pooled_patch_tokens"].float())
         mean_pooled_masked_patch_tokens.append(shard_data["mean_pooled_masked_patch_tokens"].float())
         if "patch_features" in shard_data and shard_data["patch_features"] is not None:
@@ -44,6 +52,7 @@ def load_shards(data_path: Path) -> dict[str, torch.Tensor | None]:
     return {
         "labels": torch.tensor(labels),
         "cls_tokens": torch.cat(cls_tokens),
+        "register_tokens": torch.cat(register_tokens).to("cpu") if register_tokens else None,
         "mean_pooled_patch_tokens": torch.cat(mean_pooled_patch_tokens).to("cpu"),
         "mean_pooled_masked_patch_tokens": torch.cat(mean_pooled_masked_patch_tokens).to("cpu"),
         "patch_features": torch.cat(patch_features) if patch_features else None,

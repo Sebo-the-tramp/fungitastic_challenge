@@ -31,11 +31,11 @@ from dataset.mask_fungi import MaskFungiTastic
 from dataset.utils.mask_vis import get_image_shape, resize_mask_to_image
 
 HUGGINGFACE_MODELS = [
-    # "facebook/dinov3-vits16-pretrain-lvd1689m",
-    # "facebook/dinov3-vits16plus-pretrain-lvd1689m",
-    # "facebook/dinov3-vitb16-pretrain-lvd1689m",
-    # "facebook/dinov3-vitl16-pretrain-lvd1689m",
-    # "facebook/dinov3-vith16plus-pretrain-lvd1689m",
+    "facebook/dinov3-vits16-pretrain-lvd1689m",
+    "facebook/dinov3-vits16plus-pretrain-lvd1689m",
+    "facebook/dinov3-vitb16-pretrain-lvd1689m",
+    "facebook/dinov3-vitl16-pretrain-lvd1689m",
+    "facebook/dinov3-vith16plus-pretrain-lvd1689m",
     "facebook/dinov3-vit7b16-pretrain-lvd1689m",
 ]
 
@@ -78,6 +78,7 @@ def flush_shard(
     file_paths: list[str],
     labels: list[int | None],
     cls_token: list[torch.Tensor],
+    register_tokens: list[torch.Tensor] | None,
     mean_pooled_patch_tokens: list[torch.Tensor],
     mean_pooled_masked_patch_tokens: list[torch.Tensor],
     patch_feature_batches: list[torch.Tensor], #optional, can be empty if not saving patch features    
@@ -93,6 +94,7 @@ def flush_shard(
         "file_paths": list(file_paths),
         "labels": [int(label) if label is not None else None for label in labels],
         "cls_token": torch.cat(cls_token, dim=0).contiguous(),
+        "register_tokens": torch.cat(register_tokens, dim=0).contiguous() if register_tokens else None,
         "mean_pooled_patch_tokens": torch.cat(mean_pooled_patch_tokens, dim=0).contiguous(), 
         "mean_pooled_masked_patch_tokens": torch.cat(mean_pooled_masked_patch_tokens, dim=0).contiguous(),
         "patch_features": torch.cat(patch_feature_batches, dim=0).contiguous() if patch_feature_batches else None,        
@@ -103,7 +105,9 @@ def flush_shard(
     cls_token.clear()
     mean_pooled_patch_tokens.clear()
     mean_pooled_masked_patch_tokens.clear()
-    patch_feature_batches.clear()    
+    patch_feature_batches.clear()
+    register_tokens.clear() if register_tokens else None
+
     return shard_index + 1
 
 
@@ -253,6 +257,7 @@ def main() -> None:
     shard_file_paths: list[str] = []
     shard_labels: list[int | None] = []
     shard_cls_tokens_batches: list[torch.Tensor] = []
+    shard_register_tokens_batches: list[torch.Tensor] = []  # only for models with register tokens, otherwise will be empty and not saved
     shard_patch_feature_batches: list[torch.Tensor] = []
     shard_mean_pooled_patch_tokens: list[torch.Tensor] = []
     shard_mean_pooled_masked_patch_tokens: list[torch.Tensor] = []
@@ -286,11 +291,15 @@ def main() -> None:
             cls_tokens = to_storage_feature(outputs.pooler_output)
             last_hidden_states = outputs["last_hidden_state"]
 
-            patch_size = model.config.patch_size                
+            patch_size = model.config.patch_size
             _, _, img_height, img_width = itorchuts["pixel_values"].shape
             num_patches_height, num_patches_width = img_height // patch_size, img_width // patch_size
+            register_tokens = last_hidden_states[:, 1:1+model.config.num_register_tokens, :] if model.config.num_register_tokens > 0 else None
             patch_features_flat = last_hidden_states[:, 1 + model.config.num_register_tokens:, :]
             patch_features = patch_features_flat.unflatten(1, (num_patches_height, num_patches_width))   
+            
+            register_tokens = to_storage_feature(register_tokens) if register_tokens is not None else None
+            shard_register_tokens_batches.append(register_tokens)
 
             # computing mean_pooled_patch_tokens
             mean_pooled_patch_tokens = compute_mean_pooled_patch_tokens(patch_features)
@@ -321,9 +330,10 @@ def main() -> None:
                     file_paths=shard_file_paths,
                     labels=shard_labels,
                     cls_token=shard_cls_tokens_batches,
+                    register_tokens=shard_register_tokens_batches,
                     mean_pooled_patch_tokens=shard_mean_pooled_patch_tokens,
                     mean_pooled_masked_patch_tokens=shard_mean_pooled_masked_patch_tokens,
-                    patch_feature_batches=shard_patch_feature_batches,                    
+                    patch_feature_batches=shard_patch_feature_batches,
                 )
                 buffered_items = 0
 
@@ -333,6 +343,7 @@ def main() -> None:
         file_paths=shard_file_paths,
         labels=shard_labels,
         cls_token=shard_cls_tokens_batches,
+        register_tokens=shard_register_tokens_batches,
         mean_pooled_patch_tokens=shard_mean_pooled_patch_tokens,
         mean_pooled_masked_patch_tokens=shard_mean_pooled_masked_patch_tokens,
         patch_feature_batches=shard_patch_feature_batches,                    

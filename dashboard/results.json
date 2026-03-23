@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-03-23T11:41:23Z",
+  "updated_at": "2026-03-23T15:51:46Z",
   "overview": {
-    "total_runs": 6,
+    "total_runs": 7,
     "planned_experiments": 9,
     "planned_items": 129,
     "completed_items": 64,
@@ -166,6 +166,13 @@
           "timestamp": "2026-03-23T11:07:38Z"
         },
         {
+          "value": "cls+register",
+          "item_id": "cls+register",
+          "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_224_mlp",
+          "test_acc": 0.717402458190918,
+          "timestamp": "2026-03-23T15:51:46Z"
+        },
+        {
           "value": "masked",
           "item_id": "masked",
           "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_448_mlp",
@@ -178,6 +185,13 @@
           "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_448_mlp",
           "test_acc": 0.656765341758728,
           "timestamp": "2026-03-23T11:07:38Z"
+        },
+        {
+          "value": "register",
+          "item_id": "register",
+          "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_224_mlp",
+          "test_acc": 0.6756120324134827,
+          "timestamp": "2026-03-23T15:51:46Z"
         }
       ]
     }
@@ -185,10 +199,10 @@
   "experiments": [
     {
       "id": "dinov3-vit7b16-pretrain-lvd1689m_normal_224_mlp",
-      "num_runs": 1,
+      "num_runs": 2,
       "completed_items": 7,
       "total_items": 7,
-      "latest_timestamp": "2026-03-23T11:06:17Z",
+      "latest_timestamp": "2026-03-23T15:51:46Z",
       "best": {
         "item_id": "cls+masked",
         "test_acc": 0.7404486536979675
@@ -209,18 +223,16 @@
           },
           "best_meta": {
             "features": "cls_tokens",
-            "normalize": "no",
             "params": 1290711,
             "best_epoch": 14
           },
           "latest_meta": {
             "features": "cls_tokens",
-            "normalize": "no",
             "params": 1290711,
             "best_epoch": 14
           },
-          "best_timestamp": "2026-03-23T11:06:17Z",
-          "latest_timestamp": "2026-03-23T11:06:17Z"
+          "best_timestamp": "2026-03-23T15:51:46Z",
+          "latest_timestamp": "2026-03-23T15:51:46Z"
         },
         {
           "name": "patch",
@@ -237,18 +249,16 @@
           },
           "best_meta": {
             "features": "mean_pooled_patch_tokens",
-            "normalize": "no",
             "params": 1290711,
             "best_epoch": 25
           },
           "latest_meta": {
             "features": "mean_pooled_patch_tokens",
-            "normalize": "no",
             "params": 1290711,
             "best_epoch": 25
           },
-          "best_timestamp": "2026-03-23T11:06:17Z",
-          "latest_timestamp": "2026-03-23T11:06:17Z"
+          "best_timestamp": "2026-03-23T15:51:46Z",
+          "latest_timestamp": "2026-03-23T15:51:46Z"
         },
         {
           "name": "masked",
@@ -265,18 +275,16 @@
           },
           "best_meta": {
             "features": "mean_pooled_masked_patch_tokens",
-            "normalize": "no",
             "params": 1290711,
             "best_epoch": 18
           },
           "latest_meta": {
             "features": "mean_pooled_masked_patch_tokens",
-            "normalize": "no",
             "params": 1290711,
             "best_epoch": 18
           },
-          "best_timestamp": "2026-03-23T11:06:17Z",
-          "latest_timestamp": "2026-03-23T11:06:17Z"
+          "best_timestamp": "2026-03-23T15:51:46Z",
+          "latest_timestamp": "2026-03-23T15:51:46Z"
         },
         {
           "name": "cls+patch",
@@ -293,18 +301,16 @@
           },
           "best_meta": {
             "features": "cls_tokens+mean_pooled_patch_tokens",
-            "normalize": "no",
             "params": 2470615,
             "best_epoch": 14
           },
           "latest_meta": {
             "features": "cls_tokens+mean_pooled_patch_tokens",
-            "normalize": "no",
             "params": 2470615,
             "best_epoch": 14
           },
-          "best_timestamp": "2026-03-23T11:06:17Z",
-          "latest_timestamp": "2026-03-23T11:06:17Z"
+          "best_timestamp": "2026-03-23T15:51:46Z",
+          "latest_timestamp": "2026-03-23T15:51:46Z"
         },
         {
           "name": "cls+patch_norm",
@@ -349,18 +355,16 @@
           },
           "best_meta": {
             "features": "cls_tokens+mean_pooled_masked_patch_tokens",
-            "normalize": "no",
             "params": 2470615,
             "best_epoch": 14
           },
           "latest_meta": {
             "features": "cls_tokens+mean_pooled_masked_patch_tokens",
-            "normalize": "no",
             "params": 2470615,
             "best_epoch": 14
           },
-          "best_timestamp": "2026-03-23T11:06:17Z",
-          "latest_timestamp": "2026-03-23T11:06:17Z"
+          "best_timestamp": "2026-03-23T15:51:46Z",
+          "latest_timestamp": "2026-03-23T15:51:46Z"
         },
         {
           "name": "cls+masked_norm",

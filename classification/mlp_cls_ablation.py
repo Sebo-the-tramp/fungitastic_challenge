@@ -1,5 +1,4 @@
 import torch
-import torch.nn.functional as F
 
 from tqdm import tqdm
 from pathlib import Path
@@ -12,7 +11,7 @@ from utils import load_shards, save_run, seed_everything
 SEED = 7
 SCRIPT_PATH = "classification/mlp_cls_ablation.py"
 BACKBONE = "dinov3-vit7b16-pretrain-lvd1689m"
-IMAGE_SIZE = 448
+IMAGE_SIZE = 224
 BACKGROUND_AUG = "normal"
 FINAL_LAYER_CLASSIFIER_METHOD = "mlp"
 EXPERIMENT_ID = f"{BACKBONE}_{BACKGROUND_AUG}_{IMAGE_SIZE}_{FINAL_LAYER_CLASSIFIER_METHOD}"
@@ -32,14 +31,14 @@ VAL_FRACTION = 0.15
 PROJECTION_DIM = 256
 HIDDEN_DIM = 512
 
-EXPERIMENTS: list[tuple[str, tuple[str, ...], bool]] = [
-    ("cls", ("cls_tokens",), False),
-    ("patch", ("mean_pooled_patch_tokens",), False),
-    ("masked", ("mean_pooled_masked_patch_tokens",), False),
-    ("cls+patch", ("cls_tokens", "mean_pooled_patch_tokens"), False),
-    ("cls+patch_norm", ("cls_tokens", "mean_pooled_patch_tokens"), True),
-    ("cls+masked", ("cls_tokens", "mean_pooled_masked_patch_tokens"), False),
-    ("cls+masked_norm", ("cls_tokens", "mean_pooled_masked_patch_tokens"), True),
+EXPERIMENTS: list[tuple[str, tuple[str, ...]]] = [
+    ("cls", ("cls_tokens",)),
+    ("register", ("register_tokens_0",)),
+    ("patch", ("mean_pooled_patch_tokens",)),
+    ("masked", ("mean_pooled_masked_patch_tokens",)),
+    ("cls+register", ("cls_tokens", "register_tokens_0")),
+    ("cls+patch", ("cls_tokens", "mean_pooled_patch_tokens")),
+    ("cls+masked", ("cls_tokens", "mean_pooled_masked_patch_tokens")),
 ]
 
 CONSOLE = Console()
@@ -112,7 +111,6 @@ def prepare_branches(
     features: dict[str, torch.Tensor],
     names: tuple[str, ...],
     indices: torch.Tensor | None,
-    normalize_inputs: bool,
     device: torch.device,
 ) -> list[torch.Tensor]:
     branches = []
@@ -120,8 +118,6 @@ def prepare_branches(
         branch = features[name]
         if indices is not None:
             branch = branch[indices]
-        if normalize_inputs:
-            branch = F.normalize(branch, dim=1)
         branches.append(branch.to(device))
     return branches
 
@@ -147,7 +143,6 @@ def count_parameters(model: torch.nn.Module) -> int:
 def run_experiment(
     name: str,
     feature_names: tuple[str, ...],
-    normalize_inputs: bool,
     train_features: dict[str, torch.Tensor],
     test_features: dict[str, torch.Tensor],
     train_labels: torch.Tensor,
@@ -158,9 +153,9 @@ def run_experiment(
 ) -> dict[str, float | int | str]:
     seed_everything(SEED)
 
-    X_train = prepare_branches(train_features, feature_names, train_indices, normalize_inputs, device)
-    X_val = prepare_branches(train_features, feature_names, val_indices, normalize_inputs, device)
-    X_test = prepare_branches(test_features, feature_names, None, normalize_inputs, device)
+    X_train = prepare_branches(train_features, feature_names, train_indices, device)
+    X_val = prepare_branches(train_features, feature_names, val_indices, device)
+    X_test = prepare_branches(test_features, feature_names, None, device)
     y_train = train_labels[train_indices].to(device)
     y_val = train_labels[val_indices].to(device)
     y_test = test_labels.to(device)
@@ -216,7 +211,6 @@ def run_experiment(
     return {
         "name": name,
         "features": "+".join(feature_names),
-        "normalize": "yes" if normalize_inputs else "no",
         "params": count_parameters(model),
         "best_epoch": best_epoch,
         "train_acc": train_accuracy,
@@ -229,7 +223,6 @@ def print_results(results: list[dict[str, float | int | str]]) -> None:
     table = Table(title="MLP CLS Ablation")
     table.add_column("Experiment")
     table.add_column("Features")
-    table.add_column("Norm")
     table.add_column("Params", justify="right")
     table.add_column("Best Epoch", justify="right")
     table.add_column("Train", justify="right")
@@ -240,7 +233,6 @@ def print_results(results: list[dict[str, float | int | str]]) -> None:
         table.add_row(
             str(result["name"]),
             str(result["features"]),
-            str(result["normalize"]),
             f"{int(result['params']):,}",
             str(result["best_epoch"]),
             f"{float(result['train_acc']):.4f}",
@@ -263,7 +255,6 @@ def save_results(results: list[dict[str, float | int | str]], run_meta: dict[str
                 },
                 "meta": {
                     "features": str(result["features"]),
-                    "normalize": str(result["normalize"]),
                     "params": int(result["params"]),
                     "best_epoch": int(result["best_epoch"]),
                 },
@@ -295,9 +286,17 @@ def main() -> None:
     train_data = load_shards(ROOT / MODEL_TRAIN)
     val_data = load_shards(ROOT / MODEL_VAL)
     test_data = load_shards(ROOT / MODEL_TEST)
+    assert train_data["register_tokens"] is not None
+    assert val_data["register_tokens"] is not None
+    assert test_data["register_tokens"] is not None
 
     train_features = {
         "cls_tokens": torch.cat([train_data["cls_tokens"], val_data["cls_tokens"]]).float(),
+        "register_tokens": torch.cat([train_data["register_tokens"], val_data["register_tokens"]]).float(),
+        "register_tokens_0": torch.cat([train_data["register_tokens"][0], val_data["register_tokens"][0]]).float(),
+        "register_tokens_1": torch.cat([train_data["register_tokens"][1], val_data["register_tokens"][1]]).float(),
+        "register_tokens_2": torch.cat([train_data["register_tokens"][2], val_data["register_tokens"][2]]).float(),
+        "register_tokens_3": torch.cat([train_data["register_tokens"][3], val_data["register_tokens"][3]]).float(),
         "mean_pooled_patch_tokens": torch.cat([
             train_data["mean_pooled_patch_tokens"],
             val_data["mean_pooled_patch_tokens"],
@@ -309,6 +308,11 @@ def main() -> None:
     }
     test_features = {
         "cls_tokens": test_data["cls_tokens"].float(),
+        "register_tokens": test_data["register_tokens"].float(),
+        "register_tokens_0": test_data["register_tokens"][0].float(),
+        "register_tokens_1": test_data["register_tokens"][1].float(),
+        "register_tokens_2": test_data["register_tokens"][2].float(),
+        "register_tokens_3": test_data["register_tokens"][3].float(),
         "mean_pooled_patch_tokens": test_data["mean_pooled_patch_tokens"].float(),
         "mean_pooled_masked_patch_tokens": test_data["mean_pooled_masked_patch_tokens"].float(),
     }
@@ -329,6 +333,8 @@ def main() -> None:
         "projection_dim": PROJECTION_DIM,
         "hidden_dim": HIDDEN_DIM,
         "num_classes": int(train_labels.max().item()) + 1,
+        "num_register_tokens": int(train_features["register_tokens"].shape[1] // train_features["cls_tokens"].shape[1]),
+        "register_feature_dim": int(train_features["register_tokens"].shape[1]),
         "num_train_samples": int(len(train_indices)),
         "num_val_samples": int(len(val_indices)),
         "num_test_samples": int(len(test_labels)),
@@ -338,12 +344,11 @@ def main() -> None:
     }
 
     results = []
-    for name, feature_names, normalize_inputs in EXPERIMENTS:
+    for name, feature_names in EXPERIMENTS:
         results.append(
             run_experiment(
                 name=name,
                 feature_names=feature_names,
-                normalize_inputs=normalize_inputs,
                 train_features=train_features,
                 test_features=test_features,
                 train_labels=train_labels,
