@@ -32,3 +32,5 @@ The draft is tied to the runs already stored in `../dashboard/results.json`:
 - MLP token ablations only
 
 It does not claim results for pending prototype, k-NN, linear-probe, or stratified analyses.
+
+All figures used by the paper live under `paper/media/`.
