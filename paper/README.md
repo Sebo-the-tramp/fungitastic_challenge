@@ -1,6 +1,6 @@
 # Paper
 
-This directory contains the current CVPR-style draft for the repo story:
+This directory contains the current CVPR-style draft aligned to the repo README story:
 
 **When do oracle segmentation masks help fine-grained fungal recognition?**
 
@@ -24,13 +24,17 @@ The local build uses:
 
 ## Scope
 
-The draft is tied to the runs already stored in `../dashboard/results.json`:
+The draft is now organized around the paper structure in `../README.md`:
 
-- frozen DINOv3 ViT-7B features
-- oracle mask-aware token pooling
-- `224` and `448` resolutions
-- MLP token ablations only
+- teaser A: 200-class oracle-segmentation comparison across the DINOv3 suite with MLP classification
+- teaser B: 2000-class SAM-3 comparison across the DINOv3 suite with MLP classification
+- backbone ablation: CLIP, SigLIP, MAE, DINOv1, DINOv2, DINOv3, InternViT
+- classifier ablation: prototype, k-NN, linear probe, MLP
 
-It does not claim results for pending prototype, k-NN, linear-probe, or stratified analyses.
+Current completed evidence already written into the draft:
 
-All figures used by the paper live under `paper/media/`.
+- DINOv3 ViT-7B MLP runs at 224 and 448
+- DINOv3 ViT-7B 224 k-NN sweep
+- exploratory 224 register-token rows from the latest MLP rerun
+
+The teaser figures currently use standard LaTeX placeholder images until the real plots are exported. Final paper-specific figures should live under `paper/media/`.

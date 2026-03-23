@@ -21,7 +21,12 @@
 \author{Anonymous Authors}
 
 \begin{document}
+\twocolumn[{%
+\renewcommand\twocolumn[1][]{#1}%
 \maketitle
+\input{sec/teaser}
+\vspace{0.6em}
+}]
 \input{sec/0_abstract}
 \input{sec/1_intro}
 \input{sec/2_setup}

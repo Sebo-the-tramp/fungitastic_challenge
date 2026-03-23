@@ -4,29 +4,24 @@
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{media/Figure1-observation.png}
-    \caption{FungiTastic observations combine images, expert-verified labels, and segmentation masks for a subset of the data \cite{picek2024fungitastic}. Our study uses the binary foreground mask only to compute mask-aware mean pooling over ViT patch tokens.}
+    \caption{FungiTastic observations combine images, expert-verified labels, and segmentation masks for a subset of the data \cite{picek2024fungitastic}. The paper studies how these masks interact with frozen visual features and lightweight classifiers.}
     \label{fig:fungitastic}
 \end{figure}
 
-\paragraph{Data.}
-The current closed-set experiments operate on extracted features for 215 classes. According to the saved run metadata, the effective split contains 19,077 training samples, 3,368 internal validation samples, and 9,763 test samples. The training code first loads the extracted \texttt{train} and \texttt{val} feature folders, concatenates them, and then creates a new stratified 85/15 train/validation split for early stopping. The held-out \texttt{test} features remain untouched.
+\paragraph{Dataset and evaluation scopes.}
+The README-level paper is organized around two scopes: a 200-class oracle-mask teaser and a 2000-class SAM-3 teaser. The currently completed closed-set slice in the repo uses extracted features for 215 classes. According to the saved run metadata, this slice contains 22,445 train/validation samples and 9,763 test samples. For the MLP runs, the stored \texttt{train} and \texttt{val} folders are merged and re-split into 19,077 training and 3,368 validation samples for early stopping. For $k$-NN, the full 22,445-sample train/validation pool is used as the retrieval bank.
 
-\paragraph{Frozen features.}
-All experiments use frozen DINOv3 ViT-7B features extracted once per image. For each sample, the extraction pipeline stores three descriptors: the global CLS token, the mean of all patch tokens, and a mask-aware mean of patch tokens where the patch weights come from the binary foreground mask. We evaluate two image resolutions, `224' and `448', under the default \texttt{normal} background setting.
+\paragraph{Segmentation conditions.}
+The paper structure in the README distinguishes three segmentation regimes: no segmentation, oracle segmentation, and SAM-3 segmentation. In descriptor terms, this corresponds to global image tokens, whole-image pooled patch tokens, and mask-aware pooled patch tokens where the pooling weights come from either ground-truth masks or predicted masks. The README also calls out register-token features as an additional descriptor to test alongside whole-image and masked pooling.
 
-\paragraph{Feature variants.}
-The token study compares seven inputs to the classifier:
-\texttt{cls},
-\texttt{patch},
-\texttt{masked},
-\texttt{cls+patch},
-\texttt{cls+patch\_norm},
-\texttt{cls+masked},
-and \texttt{cls+masked\_norm}.
-The normalized variants apply per-branch $\ell_2$ normalization before fusion.
+\paragraph{Backbone families.}
+The top-line teaser plots are defined over the DINOv3 suite. The broader backbone ablation requested in the README spans CLIP, SigLIP, MAE, DINOv1, DINOv2, DINOv3, and InternViT. At the current repo state, the completed runs populate only the DINOv3 ViT-7B slice.
 
-\paragraph{Classifier.}
-Each feature branch is projected to 256 dimensions with a linear layer followed by ReLU. The projected branches are concatenated, passed through a 512-dimensional hidden layer, and mapped to 215 output classes. Optimization uses AdamW with learning rate $3 \times 10^{-4}$, weight decay $10^{-4}$, batch size 64, and a maximum of 200 epochs. Early stopping monitors validation loss with patience 30 and minimum improvement $10^{-4}$. The seed is fixed to 7 for all runs.
+\paragraph{Classifier families.}
+The classifier ablation requested in the README includes prototype, $k$-NN, linear probe, and MLP. The completed evidence currently covers MLP runs at 224 and 448, plus a 224 $k$-NN sweep. Prototype and linear-probe tables are still pending.
+
+\paragraph{Completed DINOv3 feature variants.}
+Within the completed DINOv3 slice, the current paper writes up the descriptors that already exist in the repo: \texttt{cls}, \texttt{patch}, \texttt{masked}, \texttt{cls+patch}, \texttt{cls+masked}, and exploratory 224-only \texttt{register} and \texttt{cls+register} rows from the latest rerun. These variants directly implement the README idea of comparing whole-image, segmented, and register-style descriptors.
 
 \paragraph{Metric.}
-The current dashboard tracks top-1 accuracy, so that is the metric reported in this draft. Additional metrics such as macro accuracy and stratified scores are planned in the repo but are not yet available for the completed runs.
+The dashboard tracks top-1 accuracy, so that is the metric reported here. Stratified analyses by class frequency, mask area, and hard species pairs remain part of the planned follow-up rather than the completed draft.

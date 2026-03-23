@@ -1,16 +1,11 @@
 \section{Introduction}
 
-Fine-grained fungal recognition is difficult for the same reasons that make many ecological benchmarks interesting: species can be visually similar, the class distribution is long-tailed, and the background often contains strong clutter. FungiTastic extends earlier Danish fungi benchmarks with a much broader multi-modal dataset, including expert-verified labels, metadata, and segmentation masks for a subset of images \cite{Picek_2022_WACV,picek2022automatic,picek2024fungitastic}. This creates a clean question for the current repo: if we already have strong frozen visual features, when do oracle masks still help?
+Fine-grained fungal recognition is hard for the same reasons many ecological benchmarks are hard: subtle inter-species differences, large intra-species variation, cluttered field backgrounds, and long-tailed class frequencies. FungiTastic is a useful benchmark for this setting because it extends earlier fungi datasets with more images, richer metadata, and segmentation masks for part of the corpus \cite{Picek_2022_WACV,picek2022automatic,picek2024fungitastic}.
 
-The answer is not obvious. A foreground mask can suppress irrelevant background and isolate shape-sensitive regions, but it can also remove context that remains useful for recognition. The practical choice is therefore not just \emph{with mask} versus \emph{without mask}; it is also \emph{which token representation should receive the mask signal}, and whether that signal should replace or complement the global image representation.
+The repo README now defines a broader paper than the earlier draft. Instead of asking only whether one DINOv3 token construction is best, the target manuscript studies three questions. First, how much does segmentation help, and does the answer change between no segmentation, oracle foreground masks, and SAM-3 predicted masks? Second, which frozen feature family transfers best to fungi: CLIP, SigLIP, MAE, DINOv1, DINOv2, DINOv3, or InternViT? Third, which lightweight classifier extracts the most from those features: prototype, $k$-NN, linear probe, or MLP?
 
-This draft focuses on the narrowest version of that question. We keep the backbone fixed, keep the background augmentation fixed, and vary only token construction and image resolution. Specifically, we compare CLS-only, full patch pooling, mask-aware patch pooling, and simple feature concatenations at `224' and `448' resolution. Every variant is trained with the same small MLP on frozen features, so the comparison isolates representation quality rather than end-to-end backbone adaptation.
+This broader scope also changes what the paper should look like. The README asks for two teaser plots: one for a 200-class oracle-segmentation setting and one for a 2000-class SAM-3 setting. The body then expands those top-line plots with a backbone-family ablation and a classifier ablation. The LaTeX draft should therefore reflect that structure even before every plot has been exported.
 
-The completed runs already support three takeaways:
-\begin{itemize}[leftmargin=*]
-\item Oracle masks are most useful as a complement to global context, not as a standalone descriptor.
-\item Patch-only mean pooling is substantially weaker than CLS-based representations at both resolutions.
-\item Higher resolution improves absolute accuracy, but the marginal gain from mask fusion does not increase in the completed runs.
-\end{itemize}
+Only part of the empirical grid is completed today. The repo already contains a concrete first slice: DINOv3 ViT-7B runs with MLP heads at 224 and 448 resolution, plus a 224 $k$-NN sweep. Those runs already suggest that mask-aware pooled patches are useful when fused with the global token, while patch-only descriptors are weak. However, they do not yet answer the full README-level questions about backbone ranking, 2000-class scaling, or classifier ordering across the entire feature-family set.
 
-The rest of the paper documents this first result slice and makes the current state of the project buildable and reviewable.
+This draft is therefore written with two goals. It matches the final paper organization described in the README, and it preserves the completed DINOv3 evidence so the manuscript remains concrete and buildable while the remaining runs are added.

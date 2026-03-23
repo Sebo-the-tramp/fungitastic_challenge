@@ -1,38 +1,72 @@
 \section{Results}
 \label{sec:results}
 
+\paragraph{Result flow.}
+After the teaser comparisons, the body of the paper should answer two follow-up questions from the README: which frozen backbone family is strongest, and which lightweight classifier extracts the most from those features. The next two figure slots are placed in that order so the paper reads from top-line segmentation comparisons to broader backbone and classifier ablations before zooming into the currently completed DINOv3 slice.
+
+\begin{center}
+    \includegraphics[width=\linewidth]{example-image-c}
+    \captionof{figure}{Placeholder for the backbone-family ablation using single-vector descriptors or equivalent class-token features. This slot is intended for the comparison across CLIP, SigLIP, MAE, DINOv1, DINOv2, DINOv3, and InternViT.}
+    \label{fig:backbone-ablation}
+\end{center}
+
+\paragraph{Backbone-family ablation placeholder.}
+\Cref{fig:backbone-ablation} is the right next plot after the teaser because it broadens the question from segmentation within DINOv3 to representation choice across feature families. This is where the paper should establish whether the DINOv3 pattern survives when compared against CLIP, SigLIP, MAE, DINOv1, DINOv2, and InternViT.
+
+\begin{center}
+    \includegraphics[width=\linewidth]{example-image}
+    \captionof{figure}{Placeholder for the classifier ablation. This slot is intended for the comparison among prototype, $k$-NN, linear probe, and MLP under the chosen feature settings.}
+    \label{fig:classifier-ablation}
+\end{center}
+
+\paragraph{Classifier-ablation placeholder.}
+\Cref{fig:classifier-ablation} should follow the backbone comparison because classifier choice is easiest to interpret once the feature family and descriptor construction have been introduced. This plot will show whether the current mask-fusion trend is specific to MLPs or whether it persists for prototype, $k$-NN, and linear probes as well.
+
 \begin{table*}[t]
     \centering
     \small
-    \setlength{\tabcolsep}{8pt}
+    \setlength{\tabcolsep}{7pt}
     \begin{tabular}{lccc}
         \toprule
-        Feature variant & `224' test acc. (\%) & `448' test acc. (\%) & $\Delta_{448-224}$ \\
+        Feature variant & 224 test acc. (\%) & 448 test acc. (\%) & Note \\
         \midrule
-        \texttt{cls} & 72.22 & 74.30 & +2.08 \\
-        \texttt{patch} & 64.40 & 65.68 & +1.28 \\
-        \texttt{masked} & 72.05 & 72.12 & +0.07 \\
-        \texttt{cls+patch} & 71.97 & 74.01 & +2.05 \\
-        \texttt{cls+patch\_norm} & 71.06 & 73.27 & +2.20 \\
-        \texttt{cls+masked} & \textbf{74.04} & \textbf{75.53} & +1.49 \\
-        \texttt{cls+masked\_norm} & 72.41 & 73.02 & +0.61 \\
+        \texttt{cls} & 72.22 & 74.30 & global token baseline \\
+        \texttt{patch} & 64.40 & 65.68 & whole-image patch mean \\
+        \texttt{masked} & 72.05 & 72.12 & oracle mask pooled patches \\
+        \texttt{cls+patch} & 71.97 & 74.01 & global + whole-image pooled patches \\
+        \texttt{cls+masked} & \textbf{74.04} & \textbf{75.53} & global + oracle masked patches \\
+        \texttt{register} & 67.56 & -- & exploratory 224-only register token \\
+        \texttt{cls+register} & 71.74 & -- & exploratory 224-only fusion \\
         \bottomrule
     \end{tabular}
-    \caption{Top-1 test accuracy for the completed MLP token study. Oracle mask information is most effective when fused with the global CLS token.}
-    \label{tab:main-results}
+    \caption{Completed DINOv3 ViT-7B MLP slice currently available in the repo. The main README-aligned comparison is between global, pooled, masked, and fused descriptors; the latest 224 rerun also logs register-based variants.}
+    \label{tab:mlp-results}
 \end{table*}
 
-\paragraph{Mask fusion is the best completed configuration.}
-\Cref{tab:main-results} shows a clear winner: \texttt{cls+masked} is the best feature variant at both resolutions. Relative to plain \texttt{cls}, mask fusion improves top-1 test accuracy by 1.82 points at `224' and 1.23 points at `448'. Relative to \texttt{cls+patch}, the gain is 2.08 points at `224' and 1.52 points at `448'. This supports the practical view that masks are useful primarily as an additional local cue on top of a strong global descriptor.
+\paragraph{Completed segmentation slice: DINOv3 + MLP.}
+\Cref{tab:mlp-results} retains the completed slice that already exists in the repo. The main pattern is consistent across both resolutions: \texttt{cls+masked} is the best configuration, outperforming plain \texttt{cls} by 1.82 points at 224 and 1.23 points at 448. Mask-aware pooling alone stays close to \texttt{cls} at 224 but falls behind at 448, while plain patch averaging is clearly weak. In the latest 224 rerun, the exploratory register variants also trail \texttt{cls+masked}, so the strongest current evidence still favors global context plus segmented local evidence.
 
-\paragraph{Masked pooling alone is not enough.}
-The \texttt{masked} variant does not beat \texttt{cls} at either resolution. At `224' it is nearly tied with \texttt{cls}, but at `448' it falls more than two points behind. This suggests that the mask helps suppress irrelevant regions, yet the global image summary still carries important context that should not be discarded.
+\begin{table}[t]
+    \centering
+    \small
+    \setlength{\tabcolsep}{8pt}
+    \begin{tabular}{lcc}
+        \toprule
+        Modality & Best $k$ & Test acc. (\%) \\
+        \midrule
+        \texttt{cls} & 9 & 52.66 \\
+        \texttt{patch} & 10 & 33.50 \\
+        \texttt{masked} & 9 & 50.98 \\
+        \texttt{cls+patch} & 10 & 49.46 \\
+        \texttt{cls+masked} & 10 & \textbf{52.86} \\
+        \bottomrule
+    \end{tabular}
+    \caption{Best 224 $k$-NN accuracy over $k=1,\dots,10$ for the completed DINOv3 slice.}
+    \label{tab:knn-results}
+\end{table}
 
-\paragraph{Naive patch pooling is consistently weak.}
-The \texttt{patch} variant is the worst model in both settings, reaching only 64.40\% at `224' and 65.68\% at `448'. Even adding patch pooling to CLS without masks does not improve over \texttt{cls} alone. The likely interpretation is that averaging all spatial tokens mixes useful foreground details with background clutter and dilutes the strongest discriminative evidence.
+\paragraph{Completed classifier slice: DINOv3 + 224 $k$-NN.}
+The current classifier comparison is only partially populated, but the 224 $k$-NN sweep already preserves the same rough ranking. \Cref{tab:knn-results} shows that \texttt{cls+masked} again gives the best result, narrowly exceeding \texttt{cls}, while \texttt{patch} is far behind. This is useful because it suggests that the segmentation effect is not unique to the MLP head.
 
-\paragraph{Higher resolution helps absolute accuracy, but not the relative mask gain.}
-Moving from `224' to `448' improves nearly every variant, and the best absolute score comes from \texttt{cls+masked} at `448'. However, the gain of \texttt{cls+masked} over \texttt{cls} shrinks from 1.82 to 1.23 points. In other words, the completed runs support \emph{higher resolution helps}, but they do not support the stronger claim that \emph{masks help more at higher resolution}.
-
-\paragraph{Input normalization is not beneficial here.}
-Both normalized fusion variants underperform their unnormalized counterparts. For this small MLP setup, simple raw feature concatenation is the stronger default.
+\paragraph{What is still missing from the final story.}
+The README-level paper is larger than the completed slice. The 200-class oracle teaser still needs its final plot export, the 2000-class SAM-3 teaser is still a placeholder, the cross-family backbone sweep has no numbers yet, and the classifier table still needs prototype and linear-probe results. The current paper therefore reports a real first result slice while making the missing pieces explicit instead of leaving the manuscript structurally narrow.
