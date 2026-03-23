@@ -1,0 +1,38 @@
+\section{Results}
+\label{sec:results}
+
+\begin{table*}[t]
+    \centering
+    \small
+    \setlength{\tabcolsep}{8pt}
+    \begin{tabular}{lccc}
+        \toprule
+        Feature variant & `224' test acc. (\%) & `448' test acc. (\%) & $\Delta_{448-224}$ \\
+        \midrule
+        \texttt{cls} & 72.22 & 74.30 & +2.08 \\
+        \texttt{patch} & 64.40 & 65.68 & +1.28 \\
+        \texttt{masked} & 72.05 & 72.12 & +0.07 \\
+        \texttt{cls+patch} & 71.97 & 74.01 & +2.05 \\
+        \texttt{cls+patch\_norm} & 71.06 & 73.27 & +2.20 \\
+        \texttt{cls+masked} & \textbf{74.04} & \textbf{75.53} & +1.49 \\
+        \texttt{cls+masked\_norm} & 72.41 & 73.02 & +0.61 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Top-1 test accuracy for the completed MLP token study. Oracle mask information is most effective when fused with the global CLS token.}
+    \label{tab:main-results}
+\end{table*}
+
+\paragraph{Mask fusion is the best completed configuration.}
+\Cref{tab:main-results} shows a clear winner: \texttt{cls+masked} is the best feature variant at both resolutions. Relative to plain \texttt{cls}, mask fusion improves top-1 test accuracy by 1.82 points at `224' and 1.23 points at `448'. Relative to \texttt{cls+patch}, the gain is 2.08 points at `224' and 1.52 points at `448'. This supports the practical view that masks are useful primarily as an additional local cue on top of a strong global descriptor.
+
+\paragraph{Masked pooling alone is not enough.}
+The \texttt{masked} variant does not beat \texttt{cls} at either resolution. At `224' it is nearly tied with \texttt{cls}, but at `448' it falls more than two points behind. This suggests that the mask helps suppress irrelevant regions, yet the global image summary still carries important context that should not be discarded.
+
+\paragraph{Naive patch pooling is consistently weak.}
+The \texttt{patch} variant is the worst model in both settings, reaching only 64.40\% at `224' and 65.68\% at `448'. Even adding patch pooling to CLS without masks does not improve over \texttt{cls} alone. The likely interpretation is that averaging all spatial tokens mixes useful foreground details with background clutter and dilutes the strongest discriminative evidence.
+
+\paragraph{Higher resolution helps absolute accuracy, but not the relative mask gain.}
+Moving from `224' to `448' improves nearly every variant, and the best absolute score comes from \texttt{cls+masked} at `448'. However, the gain of \texttt{cls+masked} over \texttt{cls} shrinks from 1.82 to 1.23 points. In other words, the completed runs support \emph{higher resolution helps}, but they do not support the stronger claim that \emph{masks help more at higher resolution}.
+
+\paragraph{Input normalization is not beneficial here.}
+Both normalized fusion variants underperform their unnormalized counterparts. For this small MLP setup, simple raw feature concatenation is the stronger default.

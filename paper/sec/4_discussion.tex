@@ -1,0 +1,13 @@
+\section{Discussion}
+
+\paragraph{What the current evidence says.}
+The completed experiments suggest a simple answer to the paper question. Oracle masks help when they refine local evidence without replacing the global representation. The strongest recipe is therefore not ``mask-only'', but ``CLS plus mask-aware pooled patches''. This is a useful negative result as well: access to an oracle foreground mask does not automatically justify discarding the original global token.
+
+\paragraph{Why patch-only pooling fails.}
+The largest gap in \Cref{tab:main-results} is between CLS-based descriptors and plain patch averaging. That gap is too large to ignore. It indicates that a naive spatial mean is a poor summary for this task, likely because fungal images often include distractors such as leaves, soil, wood, or multiple overlapping structures. Oracle masks partially correct that issue, but only the fused representation preserves enough global context to turn the correction into a consistent win.
+
+\paragraph{Current limitations.}
+This draft intentionally reports only what is already completed in the repo. The evidence is limited to one backbone, one classifier family, one random seed, one background mode, and one metric. Prototype, k-NN, and linear-probe baselines are still pending. Stratified analyses by class frequency, mask area, and hard species pairs are also still blocked. As a result, the current paper should be read as a first reproducible slice of the project rather than a finished benchmark study.
+
+\paragraph{Immediate next steps.}
+The next experiments are clear from the dashboard plan: add non-parametric and linear baselines, measure whether the same ranking survives with lower-capacity classifiers, and then stratify the gains to identify which examples benefit most from oracle masks. That follow-up is necessary before making stronger claims about representation quality or ecological failure modes.

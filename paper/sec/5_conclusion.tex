@@ -1,0 +1,3 @@
+\section{Conclusion}
+
+The current result slice gives a concrete answer. On frozen DINOv3 fungal features, oracle masks help most when they are fused with the CLS token, not when they replace it. The best completed model, \texttt{cls+masked}, reaches 74.04\% top-1 accuracy at `224' and 75.53\% at `448'. Higher resolution improves the absolute score, but the relative advantage of masks does not increase. This makes the current story for the repo precise and buildable: \emph{oracle masks are complementary local evidence, and simple token fusion is already enough to expose that effect.}

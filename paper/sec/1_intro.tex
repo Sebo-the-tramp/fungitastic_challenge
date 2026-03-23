@@ -1,0 +1,16 @@
+\section{Introduction}
+
+Fine-grained fungal recognition is difficult for the same reasons that make many ecological benchmarks interesting: species can be visually similar, the class distribution is long-tailed, and the background often contains strong clutter. FungiTastic extends earlier Danish fungi benchmarks with a much broader multi-modal dataset, including expert-verified labels, metadata, and segmentation masks for a subset of images \cite{Picek_2022_WACV,picek2022automatic,picek2024fungitastic}. This creates a clean question for the current repo: if we already have strong frozen visual features, when do oracle masks still help?
+
+The answer is not obvious. A foreground mask can suppress irrelevant background and isolate shape-sensitive regions, but it can also remove context that remains useful for recognition. The practical choice is therefore not just \emph{with mask} versus \emph{without mask}; it is also \emph{which token representation should receive the mask signal}, and whether that signal should replace or complement the global image representation.
+
+This draft focuses on the narrowest version of that question. We keep the backbone fixed, keep the background augmentation fixed, and vary only token construction and image resolution. Specifically, we compare CLS-only, full patch pooling, mask-aware patch pooling, and simple feature concatenations at `224' and `448' resolution. Every variant is trained with the same small MLP on frozen features, so the comparison isolates representation quality rather than end-to-end backbone adaptation.
+
+The completed runs already support three takeaways:
+\begin{itemize}[leftmargin=*]
+\item Oracle masks are most useful as a complement to global context, not as a standalone descriptor.
+\item Patch-only mean pooling is substantially weaker than CLS-based representations at both resolutions.
+\item Higher resolution improves absolute accuracy, but the marginal gain from mask fusion does not increase in the completed runs.
+\end{itemize}
+
+The rest of the paper documents this first result slice and makes the current state of the project buildable and reviewable.

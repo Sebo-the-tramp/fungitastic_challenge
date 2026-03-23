@@ -1,0 +1,824 @@
+{
+  "run_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_224_knn_2026-03-23T11:41:23Z",
+  "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_224_knn",
+  "script": "classification/knn.py",
+  "timestamp": "2026-03-23T11:41:23Z",
+  "meta": {
+    "seed": 7,
+    "device": "cuda",
+    "k_min": 1,
+    "k_max": 10,
+    "test_chunk_size": 256,
+    "train_chunk_size": 4096,
+    "num_train_samples": 13777,
+    "num_val_samples": 8668,
+    "num_full_train_samples": 22445,
+    "num_test_samples": 9763,
+    "model_train": "facebook/dinov3-vit7b16-pretrain-lvd1689m/bfloat16_normal_224/train",
+    "model_val": "facebook/dinov3-vit7b16-pretrain-lvd1689m/bfloat16_normal_224/val",
+    "model_test": "facebook/dinov3-vit7b16-pretrain-lvd1689m/bfloat16_normal_224/test"
+  },
+  "rows": [
+    {
+      "item_id": "cls@k=1",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls",
+        "k": 1
+      },
+      "metrics": {
+        "test_acc": 0.47577589750289917
+      },
+      "meta": {
+        "features": "cls_tokens"
+      }
+    },
+    {
+      "item_id": "cls@k=2",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls",
+        "k": 2
+      },
+      "metrics": {
+        "test_acc": 0.4605141878128052
+      },
+      "meta": {
+        "features": "cls_tokens"
+      }
+    },
+    {
+      "item_id": "cls@k=3",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls",
+        "k": 3
+      },
+      "metrics": {
+        "test_acc": 0.48868176341056824
+      },
+      "meta": {
+        "features": "cls_tokens"
+      }
+    },
+    {
+      "item_id": "cls@k=4",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls",
+        "k": 4
+      },
+      "metrics": {
+        "test_acc": 0.5015876293182373
+      },
+      "meta": {
+        "features": "cls_tokens"
+      }
+    },
+    {
+      "item_id": "cls@k=5",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls",
+        "k": 5
+      },
+      "metrics": {
+        "test_acc": 0.5160298943519592
+      },
+      "meta": {
+        "features": "cls_tokens"
+      }
+    },
+    {
+      "item_id": "cls@k=6",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls",
+        "k": 6
+      },
+      "metrics": {
+        "test_acc": 0.52012699842453
+      },
+      "meta": {
+        "features": "cls_tokens"
+      }
+    },
+    {
+      "item_id": "cls@k=7",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls",
+        "k": 7
+      },
+      "metrics": {
+        "test_acc": 0.5240192413330078
+      },
+      "meta": {
+        "features": "cls_tokens"
+      }
+    },
+    {
+      "item_id": "cls@k=8",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls",
+        "k": 8
+      },
+      "metrics": {
+        "test_acc": 0.5220731496810913
+      },
+      "meta": {
+        "features": "cls_tokens"
+      }
+    },
+    {
+      "item_id": "cls@k=9",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls",
+        "k": 9
+      },
+      "metrics": {
+        "test_acc": 0.5265799164772034
+      },
+      "meta": {
+        "features": "cls_tokens"
+      }
+    },
+    {
+      "item_id": "cls@k=10",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls",
+        "k": 10
+      },
+      "metrics": {
+        "test_acc": 0.5254532694816589
+      },
+      "meta": {
+        "features": "cls_tokens"
+      }
+    },
+    {
+      "item_id": "patch@k=1",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "patch",
+        "k": 1
+      },
+      "metrics": {
+        "test_acc": 0.2782956063747406
+      },
+      "meta": {
+        "features": "mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "patch@k=2",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "patch",
+        "k": 2
+      },
+      "metrics": {
+        "test_acc": 0.2782956063747406
+      },
+      "meta": {
+        "features": "mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "patch@k=3",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "patch",
+        "k": 3
+      },
+      "metrics": {
+        "test_acc": 0.28884562849998474
+      },
+      "meta": {
+        "features": "mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "patch@k=4",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "patch",
+        "k": 4
+      },
+      "metrics": {
+        "test_acc": 0.2997029721736908
+      },
+      "meta": {
+        "features": "mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "patch@k=5",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "patch",
+        "k": 5
+      },
+      "metrics": {
+        "test_acc": 0.31035542488098145
+      },
+      "meta": {
+        "features": "mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "patch@k=6",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "patch",
+        "k": 6
+      },
+      "metrics": {
+        "test_acc": 0.31742292642593384
+      },
+      "meta": {
+        "features": "mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "patch@k=7",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "patch",
+        "k": 7
+      },
+      "metrics": {
+        "test_acc": 0.32039332389831543
+      },
+      "meta": {
+        "features": "mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "patch@k=8",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "patch",
+        "k": 8
+      },
+      "metrics": {
+        "test_acc": 0.3269486725330353
+      },
+      "meta": {
+        "features": "mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "patch@k=9",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "patch",
+        "k": 9
+      },
+      "metrics": {
+        "test_acc": 0.32756325602531433
+      },
+      "meta": {
+        "features": "mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "patch@k=10",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "patch",
+        "k": 10
+      },
+      "metrics": {
+        "test_acc": 0.33504045009613037
+      },
+      "meta": {
+        "features": "mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "masked@k=1",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "masked",
+        "k": 1
+      },
+      "metrics": {
+        "test_acc": 0.46143603324890137
+      },
+      "meta": {
+        "features": "mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "masked@k=2",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "masked",
+        "k": 2
+      },
+      "metrics": {
+        "test_acc": 0.43767285346984863
+      },
+      "meta": {
+        "features": "mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "masked@k=3",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "masked",
+        "k": 3
+      },
+      "metrics": {
+        "test_acc": 0.47126907110214233
+      },
+      "meta": {
+        "features": "mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "masked@k=4",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "masked",
+        "k": 4
+      },
+      "metrics": {
+        "test_acc": 0.482126384973526
+      },
+      "meta": {
+        "features": "mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "masked@k=5",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "masked",
+        "k": 5
+      },
+      "metrics": {
+        "test_acc": 0.4955444037914276
+      },
+      "meta": {
+        "features": "mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "masked@k=6",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "masked",
+        "k": 6
+      },
+      "metrics": {
+        "test_acc": 0.49738809466362
+      },
+      "meta": {
+        "features": "mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "masked@k=7",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "masked",
+        "k": 7
+      },
+      "metrics": {
+        "test_acc": 0.5043531656265259
+      },
+      "meta": {
+        "features": "mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "masked@k=8",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "masked",
+        "k": 8
+      },
+      "metrics": {
+        "test_acc": 0.5057871341705322
+      },
+      "meta": {
+        "features": "mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "masked@k=9",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "masked",
+        "k": 9
+      },
+      "metrics": {
+        "test_acc": 0.5097818374633789
+      },
+      "meta": {
+        "features": "mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "masked@k=10",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "masked",
+        "k": 10
+      },
+      "metrics": {
+        "test_acc": 0.5097818374633789
+      },
+      "meta": {
+        "features": "mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+patch@k=1",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+patch",
+        "k": 1
+      },
+      "metrics": {
+        "test_acc": 0.44084811210632324
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+patch@k=2",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+patch",
+        "k": 2
+      },
+      "metrics": {
+        "test_acc": 0.41862133145332336
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+patch@k=3",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+patch",
+        "k": 3
+      },
+      "metrics": {
+        "test_acc": 0.4504762887954712
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+patch@k=4",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+patch",
+        "k": 4
+      },
+      "metrics": {
+        "test_acc": 0.46932294964790344
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+patch@k=5",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+patch",
+        "k": 5
+      },
+      "metrics": {
+        "test_acc": 0.4799754321575165
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+patch@k=6",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+patch",
+        "k": 6
+      },
+      "metrics": {
+        "test_acc": 0.4779268801212311
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+patch@k=7",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+patch",
+        "k": 7
+      },
+      "metrics": {
+        "test_acc": 0.4870429039001465
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+patch@k=8",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+patch",
+        "k": 8
+      },
+      "metrics": {
+        "test_acc": 0.48673564195632935
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+patch@k=9",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+patch",
+        "k": 9
+      },
+      "metrics": {
+        "test_acc": 0.49185702204704285
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+patch@k=10",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+patch",
+        "k": 10
+      },
+      "metrics": {
+        "test_acc": 0.4946225583553314
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+masked@k=1",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+masked",
+        "k": 1
+      },
+      "metrics": {
+        "test_acc": 0.47680017352104187
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+masked@k=2",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+masked",
+        "k": 2
+      },
+      "metrics": {
+        "test_acc": 0.45815834403038025
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+masked@k=3",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+masked",
+        "k": 3
+      },
+      "metrics": {
+        "test_acc": 0.4954419732093811
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+masked@k=4",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+masked",
+        "k": 4
+      },
+      "metrics": {
+        "test_acc": 0.5074260234832764
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+masked@k=5",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+masked",
+        "k": 5
+      },
+      "metrics": {
+        "test_acc": 0.5190002918243408
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+masked@k=6",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+masked",
+        "k": 6
+      },
+      "metrics": {
+        "test_acc": 0.519922137260437
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+masked@k=7",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+masked",
+        "k": 7
+      },
+      "metrics": {
+        "test_acc": 0.5222780108451843
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+masked@k=8",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+masked",
+        "k": 8
+      },
+      "metrics": {
+        "test_acc": 0.5256580710411072
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+masked@k=9",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+masked",
+        "k": 9
+      },
+      "metrics": {
+        "test_acc": 0.5281163454055786
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_masked_patch_tokens"
+      }
+    },
+    {
+      "item_id": "cls+masked@k=10",
+      "axes": {
+        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
+        "image_size": 224,
+        "background_aug": "normal",
+        "modality": "cls+masked",
+        "k": 10
+      },
+      "metrics": {
+        "test_acc": 0.5286284685134888
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_masked_patch_tokens"
+      }
+    }
+  ],
+  "notes": ""
+}
