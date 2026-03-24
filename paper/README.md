@@ -38,4 +38,4 @@ Current completed evidence already written into the draft:
 - DINOv3 ViT-7B 224 k-NN sweep
 - exploratory 224 register-token rows from the latest MLP rerun
 
-The teaser figures currently use standard LaTeX placeholder images until the real plots are exported. Final paper-specific figures should live under `paper/media/`.
+Teaser A now uses the exported oracle-mask DINOv3 MLP plot under `paper/media/teaser/`. Teaser B remains a placeholder until the 2000-class SAM-3 plot is exported. Final paper-specific figures should live under `paper/media/`.

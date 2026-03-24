@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-03-24T10:37:36Z",
+  "updated_at": "2026-03-24T11:33:58Z",
   "overview": {
     "total_runs": 12,
     "planned_experiments": 9,
@@ -17,42 +17,42 @@
           "item_id": "cls+masked",
           "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_448_mlp",
           "test_acc": 0.7553006410598755,
-          "timestamp": "2026-03-24T10:37:36Z"
+          "timestamp": "2026-03-24T11:20:18Z"
         },
         {
           "value": "dinov3-vitb16-pretrain-lvd1689m",
-          "item_id": "cls+masked",
+          "item_id": "cls+register_2",
           "experiment_id": "dinov3-vitb16-pretrain-lvd1689m_normal_448_mlp",
-          "test_acc": 0.6696712374687195,
-          "timestamp": "2026-03-24T10:32:26Z"
+          "test_acc": 0.6727440357208252,
+          "timestamp": "2026-03-24T11:28:27Z"
         },
         {
           "value": "dinov3-vith16plus-pretrain-lvd1689m",
           "item_id": "cls",
           "experiment_id": "dinov3-vith16plus-pretrain-lvd1689m_normal_448_mlp",
           "test_acc": 0.7284646034240723,
-          "timestamp": "2026-03-24T10:35:14Z"
+          "timestamp": "2026-03-24T11:33:58Z"
         },
         {
           "value": "dinov3-vitl16-pretrain-lvd1689m",
           "item_id": "cls",
           "experiment_id": "dinov3-vitl16-pretrain-lvd1689m_normal_448_mlp",
           "test_acc": 0.7166854739189148,
-          "timestamp": "2026-03-24T10:33:45Z"
+          "timestamp": "2026-03-24T11:31:04Z"
         },
         {
           "value": "dinov3-vits16-pretrain-lvd1689m",
           "item_id": "cls+masked",
           "experiment_id": "dinov3-vits16-pretrain-lvd1689m_normal_448_mlp",
           "test_acc": 0.6145651936531067,
-          "timestamp": "2026-03-24T10:29:42Z"
+          "timestamp": "2026-03-24T11:23:12Z"
         },
         {
           "value": "dinov3-vits16plus-pretrain-lvd1689m",
-          "item_id": "cls+masked",
+          "item_id": "cls+masked+register_3",
           "experiment_id": "dinov3-vits16plus-pretrain-lvd1689m_normal_448_mlp",
-          "test_acc": 0.621222972869873,
-          "timestamp": "2026-03-24T10:31:07Z"
+          "test_acc": 0.6237837076187134,
+          "timestamp": "2026-03-24T11:25:53Z"
         }
       ]
     },
@@ -64,7 +64,7 @@
           "item_id": "cls+masked",
           "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_448_mlp",
           "test_acc": 0.7553006410598755,
-          "timestamp": "2026-03-24T10:37:36Z"
+          "timestamp": "2026-03-24T11:20:18Z"
         }
       ]
     },
@@ -76,14 +76,14 @@
           "item_id": "cls+masked",
           "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_224_mlp",
           "test_acc": 0.7404486536979675,
-          "timestamp": "2026-03-24T10:36:52Z"
+          "timestamp": "2026-03-24T11:18:58Z"
         },
         {
           "value": "448",
           "item_id": "cls+masked",
           "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_448_mlp",
           "test_acc": 0.7553006410598755,
-          "timestamp": "2026-03-24T10:37:36Z"
+          "timestamp": "2026-03-24T11:20:18Z"
         }
       ]
     },
@@ -95,35 +95,70 @@
           "item_id": "cls",
           "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_448_mlp",
           "test_acc": 0.7430093288421631,
-          "timestamp": "2026-03-24T10:37:36Z"
+          "timestamp": "2026-03-24T11:20:18Z"
         },
         {
           "value": "cls+masked",
           "item_id": "cls+masked",
           "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_448_mlp",
           "test_acc": 0.7553006410598755,
-          "timestamp": "2026-03-24T10:37:36Z"
+          "timestamp": "2026-03-24T11:20:18Z"
+        },
+        {
+          "value": "cls+masked+register_3",
+          "item_id": "cls+masked+register_3",
+          "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_448_mlp",
+          "test_acc": 0.7501792311668396,
+          "timestamp": "2026-03-24T11:20:18Z"
         },
         {
           "value": "cls+patch",
           "item_id": "cls+patch",
           "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_448_mlp",
           "test_acc": 0.7401413321495056,
-          "timestamp": "2026-03-24T10:37:36Z"
+          "timestamp": "2026-03-24T11:20:18Z"
+        },
+        {
+          "value": "cls+register_0",
+          "item_id": "cls+register_0",
+          "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_448_mlp",
+          "test_acc": 0.7416777610778809,
+          "timestamp": "2026-03-24T11:20:18Z"
+        },
+        {
+          "value": "cls+register_1",
+          "item_id": "cls+register_1",
+          "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_448_mlp",
+          "test_acc": 0.7403461933135986,
+          "timestamp": "2026-03-24T11:20:18Z"
+        },
+        {
+          "value": "cls+register_2",
+          "item_id": "cls+register_2",
+          "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_448_mlp",
+          "test_acc": 0.7240602374076843,
+          "timestamp": "2026-03-24T11:20:18Z"
+        },
+        {
+          "value": "cls+register_3",
+          "item_id": "cls+register_3",
+          "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_448_mlp",
+          "test_acc": 0.7548909187316895,
+          "timestamp": "2026-03-24T11:20:18Z"
         },
         {
           "value": "masked",
           "item_id": "masked",
           "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_448_mlp",
           "test_acc": 0.7211922407150269,
-          "timestamp": "2026-03-24T10:37:36Z"
+          "timestamp": "2026-03-24T11:20:18Z"
         },
         {
           "value": "patch",
           "item_id": "patch",
           "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_448_mlp",
           "test_acc": 0.656765341758728,
-          "timestamp": "2026-03-24T10:37:36Z"
+          "timestamp": "2026-03-24T11:20:18Z"
         }
       ]
     }
@@ -134,7 +169,7 @@
       "num_runs": 1,
       "completed_items": 5,
       "total_items": 7,
-      "latest_timestamp": "2026-03-24T10:36:52Z",
+      "latest_timestamp": "2026-03-24T11:18:58Z",
       "best": {
         "item_id": "cls+masked",
         "test_acc": 0.7404486536979675
@@ -163,8 +198,8 @@
             "params": 1290711,
             "best_epoch": 14
           },
-          "best_timestamp": "2026-03-24T10:36:52Z",
-          "latest_timestamp": "2026-03-24T10:36:52Z"
+          "best_timestamp": "2026-03-24T11:18:58Z",
+          "latest_timestamp": "2026-03-24T11:18:58Z"
         },
         {
           "name": "patch",
@@ -189,8 +224,8 @@
             "params": 1290711,
             "best_epoch": 25
           },
-          "best_timestamp": "2026-03-24T10:36:52Z",
-          "latest_timestamp": "2026-03-24T10:36:52Z"
+          "best_timestamp": "2026-03-24T11:18:58Z",
+          "latest_timestamp": "2026-03-24T11:18:58Z"
         },
         {
           "name": "masked",
@@ -215,8 +250,8 @@
             "params": 1290711,
             "best_epoch": 18
           },
-          "best_timestamp": "2026-03-24T10:36:52Z",
-          "latest_timestamp": "2026-03-24T10:36:52Z"
+          "best_timestamp": "2026-03-24T11:18:58Z",
+          "latest_timestamp": "2026-03-24T11:18:58Z"
         },
         {
           "name": "cls+patch",
@@ -241,8 +276,8 @@
             "params": 2470615,
             "best_epoch": 14
           },
-          "best_timestamp": "2026-03-24T10:36:52Z",
-          "latest_timestamp": "2026-03-24T10:36:52Z"
+          "best_timestamp": "2026-03-24T11:18:58Z",
+          "latest_timestamp": "2026-03-24T11:18:58Z"
         },
         {
           "name": "cls+patch_norm",
@@ -271,8 +306,8 @@
             "params": 2470615,
             "best_epoch": 14
           },
-          "best_timestamp": "2026-03-24T10:36:52Z",
-          "latest_timestamp": "2026-03-24T10:36:52Z"
+          "best_timestamp": "2026-03-24T11:18:58Z",
+          "latest_timestamp": "2026-03-24T11:18:58Z"
         },
         {
           "name": "cls+masked_norm",
@@ -285,7 +320,7 @@
       "num_runs": 1,
       "completed_items": 5,
       "total_items": 7,
-      "latest_timestamp": "2026-03-24T10:37:36Z",
+      "latest_timestamp": "2026-03-24T11:20:18Z",
       "best": {
         "item_id": "cls+masked",
         "test_acc": 0.7553006410598755
@@ -314,8 +349,8 @@
             "params": 1290711,
             "best_epoch": 18
           },
-          "best_timestamp": "2026-03-24T10:37:36Z",
-          "latest_timestamp": "2026-03-24T10:37:36Z"
+          "best_timestamp": "2026-03-24T11:20:18Z",
+          "latest_timestamp": "2026-03-24T11:20:18Z"
         },
         {
           "name": "patch",
@@ -340,8 +375,8 @@
             "params": 1290711,
             "best_epoch": 29
           },
-          "best_timestamp": "2026-03-24T10:37:36Z",
-          "latest_timestamp": "2026-03-24T10:37:36Z"
+          "best_timestamp": "2026-03-24T11:20:18Z",
+          "latest_timestamp": "2026-03-24T11:20:18Z"
         },
         {
           "name": "masked",
@@ -366,8 +401,8 @@
             "params": 1290711,
             "best_epoch": 22
           },
-          "best_timestamp": "2026-03-24T10:37:36Z",
-          "latest_timestamp": "2026-03-24T10:37:36Z"
+          "best_timestamp": "2026-03-24T11:20:18Z",
+          "latest_timestamp": "2026-03-24T11:20:18Z"
         },
         {
           "name": "cls+patch",
@@ -392,8 +427,8 @@
             "params": 2470615,
             "best_epoch": 13
           },
-          "best_timestamp": "2026-03-24T10:37:36Z",
-          "latest_timestamp": "2026-03-24T10:37:36Z"
+          "best_timestamp": "2026-03-24T11:20:18Z",
+          "latest_timestamp": "2026-03-24T11:20:18Z"
         },
         {
           "name": "cls+patch_norm",
@@ -422,8 +457,8 @@
             "params": 2470615,
             "best_epoch": 14
           },
-          "best_timestamp": "2026-03-24T10:37:36Z",
-          "latest_timestamp": "2026-03-24T10:37:36Z"
+          "best_timestamp": "2026-03-24T11:20:18Z",
+          "latest_timestamp": "2026-03-24T11:20:18Z"
         },
         {
           "name": "cls+masked_norm",

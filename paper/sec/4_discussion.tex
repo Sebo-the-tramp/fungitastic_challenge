@@ -9,8 +9,8 @@ The broader manuscript asks questions about segmentation regimes, backbone famil
 \paragraph{Why the fusion ablation matters.}
 The new multi-backbone block is important because it can change the final design recommendation. If a diverse pair such as \texttt{DINO+SigLIP} already captures most of the ensemble gain, then the practical lesson is that complementary inductive biases matter more than simply accumulating more frozen encoders. If, instead, gains continue to rise with several added models, then quantity would matter more than expected. The paper should make that distinction explicit.
 
-\paragraph{Why placeholder teasers are useful right now.}
-The two teaser slots make the intended top-line story visible before the final figures exist. That keeps the paper aligned with the README and avoids the opposite problem of over-writing the manuscript around a narrow first slice that will later become only one subsection. The placeholders are therefore not cosmetic; they lock in the paper structure while the experiment grid catches up.
+\paragraph{Why keeping both teaser slots still helps.}
+Teaser~A is now a real exported figure, and that already improves the paper because the top-line oracle-mask trend is visible at a glance. Teaser~B should still remain in place as an explicit slot for the 2000-class SAM-3 result, because it preserves the intended story structure and avoids rewriting the manuscript around a narrow first slice that will later become only one subsection.
 
 \paragraph{Immediate next steps.}
-The remaining work is now clearly staged: export the two teaser plots, run the cross-family backbone sweep, finish the prototype and linear-probe baselines, and extend the classifier comparison beyond the current 224 $k$-NN slice. After that, stratified analysis by class frequency, mask area, and hard species pairs can explain where the segmentation gains actually come from.
+The remaining work is now clearly staged: export the 2000-class SAM-3 teaser, run the cross-family backbone sweep, finish the prototype and linear-probe baselines, and extend the classifier comparison beyond the current 224 $k$-NN slice. After that, stratified analysis by class frequency, mask area, and hard species pairs can explain where the segmentation gains actually come from.

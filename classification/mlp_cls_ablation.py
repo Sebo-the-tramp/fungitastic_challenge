@@ -45,7 +45,10 @@ REGISTER_EXPERIMENTS: list[tuple[str, tuple[str, ...]]] = [
     (f"cls+register_{index}", ("cls_tokens", feature_name))
     for index, feature_name in enumerate(REGISTER_FEATURE_NAMES)
 ] + [
-    ("cls+masked+register_3", ("cls_tokens", "mean_pooled_masked_patch_tokens", "register_tokens_3")),
+    (f"register_{index}", (feature_name))
+    for index, feature_name in enumerate(REGISTER_FEATURE_NAMES)
+] + [
+    ("cls+masked+register_3", ("cls_tokens", "mean_pooled_masked_patch_tokens", "register_3")),
 ]
 
 CONSOLE = Console()

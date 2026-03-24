@@ -15,13 +15,24 @@ OUTPUT_DIR = ROOT / "paper" / "media" / "teaser"
 EXPERIMENT_SUFFIX = "_mlp"
 OUTPUT_STEM = "mlp_absolute_test_acc_sorted"
 MATPLOTLIB_PATH = OUTPUT_DIR / f"{OUTPUT_STEM}.png"
-MODALITY_ORDER = ["cls", "patch", "masked", "cls+patch", "cls+masked"]
+IMAGE_SIZE = 448
+MODALITY_ORDER = [
+    "cls",
+    "patch",
+    "masked",
+    "cls+patch",
+    "cls+masked",
+    "cls+register_3",
+    "cls+masked+register_3",
+]
 COLORS = {
     "cls": "#0f172a",
     "patch": "#c2410c",
     "masked": "#15803d",
     "cls+patch": "#1d4ed8",
     "cls+masked": "#7c3aed",
+    "cls+register_3": "#0f766e",
+    "cls+masked+register_3": "#be123c",
 }
 MATPLOTLIB_MARKERS = {
     "cls": "o",
@@ -29,6 +40,8 @@ MATPLOTLIB_MARKERS = {
     "masked": "D",
     "cls+patch": "^",
     "cls+masked": "X",
+    "cls+register_3": "P",
+    "cls+masked+register_3": "*",
 }
 TITLE_SIZE = 60
 LABEL_SIZE = 48
@@ -36,7 +49,7 @@ TICK_SIZE = 38
 LEGEND_SIZE = 54
 LINE_WIDTH = 4.2
 MARKER_SIZE = 18
-MATPLOTLIB_FIGSIZE = (32, 18)
+MATPLOTLIB_FIGSIZE = (32, 34)
 BACKBONE_LABELS = {
     "vit7b16": "ViT-7B",
     "vits16": "ViT-S",
@@ -77,6 +90,8 @@ def load_records() -> list[dict[str, Any]]:
         for row in payload["rows"]:
             backbone = str(row["axes"]["backbone"])
             image_size = int(row["axes"]["image_size"])
+            if image_size != IMAGE_SIZE:
+                continue
             records.append(
                 {
                     "experiment_id": experiment_id,
@@ -164,17 +179,18 @@ def make_matplotlib(
     # ax.set_xlabel("DINOv3 backbone / input resolution sorted from lowest to highest mean test accuracy")
     # ax.set_title("MLP modality comparison across DINOv3 backbones and resolutions")
     ax.legend(
-        ncols=len(items),
+        ncols=4,
         frameon=False,
         loc="upper center",
-        bbox_to_anchor=(0.5, -0.43),
-        handlelength=1.6,
+        bbox_to_anchor=(0.5, -0.34),
+        markerscale=2.6,
+        handlelength=2.0,
         columnspacing=1.6,
         handletextpad=0.5,
     )
     ax.grid(True, axis="y", color="#d1d5db", linewidth=1.0)
     ax.grid(False, axis="x")
-    fig.subplots_adjust(bottom=0.43, top=0.9, left=0.11, right=0.99)
+    fig.subplots_adjust(bottom=0.42, top=0.95, left=0.11, right=0.99)
     return fig, ax
 
 

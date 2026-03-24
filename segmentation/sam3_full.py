@@ -1,4 +1,5 @@
 import json
+import os
 import random
 import sys
 from pathlib import Path
@@ -14,17 +15,21 @@ from tqdm.auto import tqdm
 
 PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2")
 DATASET_ROOT = Path("/data0/sebastian.cavada/datasets/FungiTastic")
-MODEL_NAME = "facebook/sam3"
-DATA_SUBSET = "all"
-SPLIT = "train"
-DATASET_SIZE = "720"
-TASK = "closed"
-OUTPUT_ROOT = PROJECT_ROOT / "data_processed" / "sam3_yolo" / DATA_SUBSET / SPLIT / DATASET_SIZE
-BATCH_SIZE = 4
-NUM_WORKERS = 8
-THRESHOLD = 0.5
-MASK_THRESHOLD = 0.5
-COMPUTE_IOU = True
+MODEL_NAME = os.environ.get("MODEL_NAME", "facebook/sam3")
+DATA_SUBSET = os.environ.get("DATA_SUBSET", "all")
+SPLIT = os.environ.get("SPLIT", "train")
+DATASET_SIZE = os.environ.get("DATASET_SIZE", "720")
+TASK = os.environ.get("TASK", "closed")
+PROMPT_MODE = os.environ.get("PROMPT_MODE", "species")
+GENERIC_PROMPT = os.environ.get("GENERIC_PROMPT", "mushroom")
+PROMPT_SLUG = GENERIC_PROMPT.lower().replace(" ", "_")
+OUTPUT_DIRNAME = "sam3_yolo" if PROMPT_MODE == "species" else f"sam3_yolo_generic_{PROMPT_SLUG}"
+OUTPUT_ROOT = PROJECT_ROOT / "data_processed" / OUTPUT_DIRNAME / DATA_SUBSET / SPLIT / DATASET_SIZE
+BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "8"))
+NUM_WORKERS = int(os.environ.get("NUM_WORKERS", "8"))
+THRESHOLD = float(os.environ.get("THRESHOLD", "0.5"))
+MASK_THRESHOLD = float(os.environ.get("MASK_THRESHOLD", "0.5"))
+COMPUTE_IOU = os.environ.get("COMPUTE_IOU", "0") == "1"
 MIN_MASK_AREA = 256
 POLYGON_EPSILON_RATIO = 0.002
 MAX_CONTOURS_PER_MASK = 4
@@ -33,14 +38,19 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MODEL_DTYPE = torch.bfloat16 if DEVICE == "cuda" else torch.float32
 PIN_MEMORY = DEVICE == "cuda"
 
+
+assert PROMPT_MODE in {"species", "generic"}, PROMPT_MODE
 assert hasattr(transformers, "Sam3Model"), "Install a transformers version that exposes Sam3Model."
 assert hasattr(transformers, "Sam3Processor"), "Install a transformers version that exposes Sam3Processor."
 
 Sam3Model = transformers.Sam3Model
 Sam3Processor = transformers.Sam3Processor
 
+DATASET = os.environ.get("DATASET", "mask_fungi_tastic")
+
 sys.path.append(str(PROJECT_ROOT / "FungiTastic"))
-from dataset.mask_fungi import MaskFungiTastic
+
+from dataset.fungi import FungiTastic
 from dataset.utils.mask_vis import get_image_shape, resize_mask_to_image
 
 
@@ -58,10 +68,10 @@ def collate_batch(
     batch: list[tuple[Image.Image, np.ndarray, int | None, str, list[str]]]
 ) -> tuple[list[Image.Image], list[np.ndarray], list[int | None], list[str]]:
     images = [item[0] for item in batch]
-    masks = [item[1] for item in batch]
-    labels = [item[2] for item in batch]
-    file_paths = [item[3] for item in batch]
-    return images, masks, labels, file_paths
+    # masks = [item[1] for item in batch] # this is not present
+    labels = [item[1] for item in batch]
+    file_paths = [item[2] for item in batch]
+    return images, [], labels, file_paths
 
 
 def confirm_override(path: Path) -> None:
@@ -71,12 +81,18 @@ def confirm_override(path: Path) -> None:
         assert answer == "y"
 
 
-def build_label_maps(dataset: MaskFungiTastic) -> tuple[dict[int, int], dict[int, str], list[str]]:
+def build_label_maps(dataset: FungiTastic) -> tuple[dict[int, int], dict[int, str], list[str]]:
     category_ids = sorted(category_id for category_id in dataset.category_id2label if category_id >= 0)
     category_to_yolo = {category_id: index for index, category_id in enumerate(category_ids)}
     category_to_name = {category_id: dataset.category_id2label[category_id] for category_id in category_ids}
     class_names = [category_to_name[category_id] for category_id in category_ids]
     return category_to_yolo, category_to_name, class_names
+
+
+def build_prompt_config(dataset: FungiTastic) -> tuple[dict[int, int], dict[int, str], list[str]]:
+    if PROMPT_MODE == "generic":
+        return {}, {}, [GENERIC_PROMPT]
+    return build_label_maps(dataset)
 
 
 def save_metadata(class_names: list[str]) -> None:
@@ -88,7 +104,9 @@ def save_metadata(class_names: list[str]) -> None:
         "split": SPLIT,
         "dataset_size": DATASET_SIZE,
         "task": TASK,
-        "prompt_source": "dataset_species_name",
+        "prompt_mode": PROMPT_MODE,
+        "generic_prompt": GENERIC_PROMPT if PROMPT_MODE == "generic" else None,
+        "prompt_source": "dataset_species_name" if PROMPT_MODE == "species" else "single_generic_prompt",
         "num_classes": len(class_names),
         "compute_iou": COMPUTE_IOU,
         "threshold": THRESHOLD,
@@ -175,11 +193,23 @@ def compute_iou(pred_mask: np.ndarray, gt_mask: np.ndarray) -> float:
     return float(intersection / union)
 
 
+def build_batch_prompts_and_classes(
+    labels: list[int | None],
+    category_to_yolo: dict[int, int],
+    category_to_name: dict[int, str],
+) -> tuple[list[str], list[int]]:
+    if PROMPT_MODE == "generic":
+        return [GENERIC_PROMPT] * len(labels), [0] * len(labels)
+    prompts = [category_to_name[int(label)] for label in labels]
+    class_ids = [category_to_yolo[int(label)] for label in labels]
+    return prompts, class_ids
+
+
 def main() -> None:
     seed_everything(SEED)
-    confirm_override(OUTPUT_ROOT)
+    # confirm_override(OUTPUT_ROOT)
 
-    dataset = MaskFungiTastic(
+    dataset = FungiTastic(
         root=str(DATASET_ROOT),
         data_subset=DATA_SUBSET,
         split=SPLIT,
@@ -188,7 +218,7 @@ def main() -> None:
         transform=None,
         seg_task="binary",
     )
-    category_to_yolo, category_to_name, class_names = build_label_maps(dataset)
+    category_to_yolo, category_to_name, class_names = build_prompt_config(dataset)
     save_metadata(class_names)
 
     processor = Sam3Processor.from_pretrained(MODEL_NAME)
@@ -214,8 +244,7 @@ def main() -> None:
     with torch.inference_mode():
         progress = tqdm(dataloader, desc="sam3", unit="batch")
         for images, masks, labels, file_paths in progress:
-            prompts = [category_to_name[int(label)] for label in labels]
-            class_ids = [category_to_yolo[int(label)] for label in labels]
+            prompts, class_ids = build_batch_prompts_and_classes(labels, category_to_yolo, category_to_name)
             raw_inputs = processor(
                 images=images,
                 text=prompts,
