@@ -6,6 +6,9 @@ Even after broadening the paper, the current DINOv3 slice still says something c
 \paragraph{Why the README-level paper still needs more runs.}
 The broader manuscript asks questions about segmentation regimes, backbone families, and classifier choice. The current evidence covers only one backbone and an incomplete classifier set. It is therefore strong enough to justify the local claim that mask-aware fusion helps in the current DINOv3 setting, but it is not strong enough to rank CLIP against DINOv3, to compare oracle masks against SAM-3 at scale, or to state whether MLP, prototype, and linear probe will preserve the same ordering.
 
+\paragraph{Why the fusion ablation matters.}
+The new multi-backbone block is important because it can change the final design recommendation. If a diverse pair such as \texttt{DINO+SigLIP} already captures most of the ensemble gain, then the practical lesson is that complementary inductive biases matter more than simply accumulating more frozen encoders. If, instead, gains continue to rise with several added models, then quantity would matter more than expected. The paper should make that distinction explicit.
+
 \paragraph{Why placeholder teasers are useful right now.}
 The two teaser slots make the intended top-line story visible before the final figures exist. That keeps the paper aligned with the README and avoids the opposite problem of over-writing the manuscript around a narrow first slice that will later become only one subsection. The placeholders are therefore not cosmetic; they lock in the paper structure while the experiment grid catches up.
 

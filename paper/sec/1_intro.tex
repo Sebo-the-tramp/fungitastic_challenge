@@ -6,6 +6,8 @@ The repo README now defines a broader paper than the earlier draft. Instead of a
 
 This broader scope also changes what the paper should look like. The README asks for two teaser plots: one for a 200-class oracle-segmentation setting and one for a 2000-class SAM-3 setting. The body then expands those top-line plots with a backbone-family ablation and a classifier ablation. The LaTeX draft should therefore reflect that structure even before every plot has been exported.
 
+A related question follows naturally once multiple backbone families are on the table: is the gain coming from \emph{more models} or from \emph{more diverse models}? In practice, a diverse pair such as DINO plus SigLIP may already capture most of the benefit, while adding several more encoders could produce only marginal gains. The paper should reserve space for that fusion ablation because it changes the design recommendation from ``use a larger ensemble'' to ``use a complementary ensemble''.
+
 Only part of the empirical grid is completed today. The repo already contains a concrete first slice: DINOv3 ViT-7B runs with MLP heads at 224 and 448 resolution, plus a 224 $k$-NN sweep. Those runs already suggest that mask-aware pooled patches are useful when fused with the global token, while patch-only descriptors are weak. However, they do not yet answer the full README-level questions about backbone ranking, 2000-class scaling, or classifier ordering across the entire feature-family set.
 
 This draft is therefore written with two goals. It matches the final paper organization described in the README, and it preserves the completed DINOv3 evidence so the manuscript remains concrete and buildable while the remaining runs are added.

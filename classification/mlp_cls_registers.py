@@ -1,4 +1,3 @@
-import os
 import torch
 
 from tqdm import tqdm
@@ -10,11 +9,11 @@ from utils import load_shards, save_run, seed_everything
 
  
 SEED = 7
-SCRIPT_PATH = "classification/mlp_cls_ablation.py"
-BACKBONE = os.environ.get("BACKBONE", "dinov3-vit7b16-pretrain-lvd1689m")
-IMAGE_SIZE = os.environ.get("IMAGE_SIZE", 224)
+SCRIPT_PATH = "classification/mlp_cls_registers.py"
+BACKBONE = "dinov3-vit7b16-pretrain-lvd1689m"
+IMAGE_SIZE = 224
 BACKGROUND_AUG = "normal"
-FINAL_LAYER_CLASSIFIER_METHOD = "mlp"
+FINAL_LAYER_CLASSIFIER_METHOD = "mlp_cls_registers"
 EXPERIMENT_ID = f"{BACKBONE}_{BACKGROUND_AUG}_{IMAGE_SIZE}_{FINAL_LAYER_CLASSIFIER_METHOD}"
 
 MODEL_TRAIN = Path(f"facebook/{BACKBONE}/bfloat16_normal_{IMAGE_SIZE}/train")
@@ -31,13 +30,26 @@ MIN_DELTA = 1e-4
 VAL_FRACTION = 0.15
 PROJECTION_DIM = 256
 HIDDEN_DIM = 512
+NUM_REGISTER_TOKENS = 4
+BRANCH_MLP = "branch_mlp"
+SOFTMAX_GATED_REGISTER_CONCAT_MLP = "softmax_gated_register_concat_mlp"
 
-EXPERIMENTS: list[tuple[str, tuple[str, ...]]] = [
-    ("cls", ("cls_tokens",)),
-    ("patch", ("mean_pooled_patch_tokens",)),
-    ("masked", ("mean_pooled_masked_patch_tokens",)),
-    ("cls+patch", ("cls_tokens", "mean_pooled_patch_tokens")),
-    ("cls+masked", ("cls_tokens", "mean_pooled_masked_patch_tokens")),
+REGISTER_FEATURE_NAMES = tuple(f"register_tokens_{index}" for index in range(NUM_REGISTER_TOKENS))
+REGISTER_EXPERIMENTS: list[tuple[str, str, tuple[str, ...]]] = [
+    (f"register_{index}", BRANCH_MLP, (feature_name,))
+    for index, feature_name in enumerate(REGISTER_FEATURE_NAMES)
+]
+CLS_REGISTER_EXPERIMENTS: list[tuple[str, str, tuple[str, ...]]] = [
+    (f"cls+register_{index}", BRANCH_MLP, ("cls_tokens", feature_name))
+    for index, feature_name in enumerate(REGISTER_FEATURE_NAMES)
+]
+
+EXPERIMENTS: list[tuple[str, str, tuple[str, ...]]] = [
+    ("cls+masked+register_3", BRANCH_MLP, ("cls_tokens", "mean_pooled_masked_patch_tokens", "register_tokens_3")),
+    ("cls", BRANCH_MLP, ("cls_tokens",)),
+    *REGISTER_EXPERIMENTS,
+    # *CLS_REGISTER_EXPERIMENTS,
+    ("cls+registers_softmax_gated_concat", SOFTMAX_GATED_REGISTER_CONCAT_MLP, ("cls_tokens", *REGISTER_FEATURE_NAMES)),
 ]
 
 CONSOLE = Console()
@@ -61,6 +73,39 @@ class BranchMLP(torch.nn.Module):
         fused = torch.cat(encoded, dim=1)
         hidden = torch.relu(self.fusion(fused))
         return self.output(hidden)
+
+
+class SoftmaxGatedRegisterConcatMLP(torch.nn.Module):
+    def __init__(self, input_dims: list[int], projection_dim: int, hidden_dim: int, num_classes: int) -> None:
+        super().__init__()
+        assert len(input_dims) > 1
+        self.register_weight_logits = torch.nn.Parameter(torch.zeros(len(input_dims) - 1))
+        self.cls_projection = torch.nn.Sequential(
+            torch.nn.Linear(input_dims[0], projection_dim),
+            torch.nn.ReLU(),
+        )
+        self.register_projections = torch.nn.ModuleList([
+            torch.nn.Sequential(
+                torch.nn.Linear(input_dim, projection_dim),
+                torch.nn.ReLU(),
+            )
+            for input_dim in input_dims[1:]
+        ])
+        self.fusion = torch.nn.Linear(len(input_dims) * projection_dim, hidden_dim)
+        self.output = torch.nn.Linear(hidden_dim, num_classes)
+
+    def forward(self, branches: list[torch.Tensor]) -> torch.Tensor:
+        cls_branch = self.cls_projection(branches[0])
+        register_weights = torch.softmax(self.register_weight_logits, dim=0)
+        register_branches = [
+            weight * projection(branch)
+            for weight, projection, branch in zip(register_weights, self.register_projections, branches[1:])
+        ]
+        hidden = torch.relu(self.fusion(torch.cat([cls_branch, *register_branches], dim=1)))
+        return self.output(hidden)
+
+    def get_weights(self) -> torch.Tensor:
+        return torch.softmax(self.register_weight_logits.detach(), dim=0)
 
 
 def remap_labels_from_reference(
@@ -139,8 +184,33 @@ def count_parameters(model: torch.nn.Module) -> int:
     return sum(parameter.numel() for parameter in model.parameters())
 
 
+def build_model(model_name: str, input_dims: list[int], num_classes: int) -> torch.nn.Module:
+    if model_name == BRANCH_MLP:
+        return BranchMLP(
+            input_dims=input_dims,
+            projection_dim=PROJECTION_DIM,
+            hidden_dim=HIDDEN_DIM,
+            num_classes=num_classes,
+        )
+    assert model_name == SOFTMAX_GATED_REGISTER_CONCAT_MLP
+    return SoftmaxGatedRegisterConcatMLP(
+        input_dims=input_dims,
+        projection_dim=PROJECTION_DIM,
+        hidden_dim=HIDDEN_DIM,
+        num_classes=num_classes,
+    )
+
+
+def format_weights(feature_names: tuple[str, ...], weights: torch.Tensor) -> str:
+    return ", ".join(
+        f"{feature_name}={float(weight):.4f}"
+        for feature_name, weight in zip(feature_names, weights.tolist())
+    )
+
+
 def run_experiment(
     name: str,
+    model_name: str,
     feature_names: tuple[str, ...],
     train_features: dict[str, torch.Tensor],
     test_features: dict[str, torch.Tensor],
@@ -159,10 +229,9 @@ def run_experiment(
     y_val = train_labels[val_indices].to(device)
     y_test = test_labels.to(device)
 
-    model = BranchMLP(
+    model = build_model(
+        model_name=model_name,
         input_dims=[branch.shape[1] for branch in X_train],
-        projection_dim=PROJECTION_DIM,
-        hidden_dim=HIDDEN_DIM,
         num_classes=int(train_labels.max().item()) + 1,
     ).to(device)
 
@@ -206,20 +275,26 @@ def run_experiment(
     _, train_accuracy = evaluate_split(model, X_train, y_train, criterion)
     _, val_accuracy = evaluate_split(model, X_val, y_val, criterion)
     _, test_accuracy = evaluate_split(model, X_test, y_test, criterion)
+    learned_weights = ""
+    if model_name == SOFTMAX_GATED_REGISTER_CONCAT_MLP:
+        assert isinstance(model, SoftmaxGatedRegisterConcatMLP)
+        learned_weights = format_weights(feature_names[1:], model.get_weights().cpu())
 
     return {
         "name": name,
+        "model": model_name,
         "features": "+".join(feature_names),
         "params": count_parameters(model),
         "best_epoch": best_epoch,
         "train_acc": train_accuracy,
         "val_acc": val_accuracy,
         "test_acc": test_accuracy,
+        "learned_weights": learned_weights,
     }
 
 
 def print_results(results: list[dict[str, float | int | str]]) -> None:
-    table = Table(title="MLP CLS Ablation")
+    table = Table(title="MLP CLS Registers")
     table.add_column("Experiment")
     table.add_column("Features")
     table.add_column("Params", justify="right")
@@ -253,9 +328,15 @@ def save_results(results: list[dict[str, float | int | str]], run_meta: dict[str
                     "modality": str(result["name"]),
                 },
                 "meta": {
+                    "model": str(result["model"]),
                     "features": str(result["features"]),
                     "params": int(result["params"]),
                     "best_epoch": int(result["best_epoch"]),
+                    **(
+                        {"learned_weights": str(result["learned_weights"])}
+                        if str(result["learned_weights"])
+                        else {}
+                    ),
                 },
                 "metrics": {
                     "train_acc": float(result["train_acc"]),
@@ -285,9 +366,19 @@ def main() -> None:
     train_data = load_shards(ROOT / MODEL_TRAIN)
     val_data = load_shards(ROOT / MODEL_VAL)
     test_data = load_shards(ROOT / MODEL_TEST)
+    assert train_data["register_tokens"] is not None
+    assert val_data["register_tokens"] is not None
+    assert test_data["register_tokens"] is not None
 
+    train_register_tokens = torch.cat([train_data["register_tokens"], val_data["register_tokens"]]).float()
+    test_register_tokens = test_data["register_tokens"].float()
     train_features = {
         "cls_tokens": torch.cat([train_data["cls_tokens"], val_data["cls_tokens"]]).float(),
+        "register_tokens": train_register_tokens,
+        **{
+            name: train_register_tokens[:, index, :]
+            for index, name in enumerate(REGISTER_FEATURE_NAMES)
+        },
         "mean_pooled_patch_tokens": torch.cat([
             train_data["mean_pooled_patch_tokens"],
             val_data["mean_pooled_patch_tokens"],
@@ -299,6 +390,11 @@ def main() -> None:
     }
     test_features = {
         "cls_tokens": test_data["cls_tokens"].float(),
+        "register_tokens": test_register_tokens,
+        **{
+            name: test_register_tokens[:, index, :]
+            for index, name in enumerate(REGISTER_FEATURE_NAMES)
+        },
         "mean_pooled_patch_tokens": test_data["mean_pooled_patch_tokens"].float(),
         "mean_pooled_masked_patch_tokens": test_data["mean_pooled_masked_patch_tokens"].float(),
     }
@@ -319,6 +415,8 @@ def main() -> None:
         "projection_dim": PROJECTION_DIM,
         "hidden_dim": HIDDEN_DIM,
         "num_classes": int(train_labels.max().item()) + 1,
+        "num_register_tokens": int(train_register_tokens.shape[1]),
+        "register_feature_dim": int(train_register_tokens.shape[2]),
         "num_train_samples": int(len(train_indices)),
         "num_val_samples": int(len(val_indices)),
         "num_test_samples": int(len(test_labels)),
@@ -328,10 +426,11 @@ def main() -> None:
     }
 
     results = []
-    for name, feature_names in EXPERIMENTS:
+    for name, model_name, feature_names in EXPERIMENTS:
         results.append(
             run_experiment(
                 name=name,
+                model_name=model_name,
                 feature_names=feature_names,
                 train_features=train_features,
                 test_features=test_features,

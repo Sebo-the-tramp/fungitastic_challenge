@@ -1,0 +1,124 @@
+{
+  "run_id": "dinov3-vits16-pretrain-lvd1689m_normal_448_mlp_2026-03-24T10:29:42Z",
+  "experiment_id": "dinov3-vits16-pretrain-lvd1689m_normal_448_mlp",
+  "script": "classification/mlp_cls_ablation.py",
+  "timestamp": "2026-03-24T10:29:42Z",
+  "meta": {
+    "seed": 7,
+    "device": "cuda",
+    "batch_size": 64,
+    "learning_rate": 0.0003,
+    "weight_decay": 0.0001,
+    "max_epochs": 200,
+    "patience": 30,
+    "min_delta": 0.0001,
+    "val_fraction": 0.15,
+    "projection_dim": 256,
+    "hidden_dim": 512,
+    "num_classes": 215,
+    "num_train_samples": 19077,
+    "num_val_samples": 3368,
+    "num_test_samples": 9763,
+    "model_train": "facebook/dinov3-vits16-pretrain-lvd1689m/bfloat16_normal_448/train",
+    "model_val": "facebook/dinov3-vits16-pretrain-lvd1689m/bfloat16_normal_448/val",
+    "model_test": "facebook/dinov3-vits16-pretrain-lvd1689m/bfloat16_normal_448/test"
+  },
+  "rows": [
+    {
+      "item_id": "cls",
+      "axes": {
+        "backbone": "dinov3-vits16-pretrain-lvd1689m",
+        "image_size": "448",
+        "background_aug": "normal",
+        "modality": "cls"
+      },
+      "metrics": {
+        "train_acc": 0.813912034034729,
+        "val_acc": 0.6172803044319153,
+        "test_acc": 0.606063723564148
+      },
+      "meta": {
+        "features": "cls_tokens",
+        "params": 340439,
+        "best_epoch": 19
+      }
+    },
+    {
+      "item_id": "patch",
+      "axes": {
+        "backbone": "dinov3-vits16-pretrain-lvd1689m",
+        "image_size": "448",
+        "background_aug": "normal",
+        "modality": "patch"
+      },
+      "metrics": {
+        "train_acc": 0.7114850282669067,
+        "val_acc": 0.5409739017486572,
+        "test_acc": 0.4962613880634308
+      },
+      "meta": {
+        "features": "mean_pooled_patch_tokens",
+        "params": 340439,
+        "best_epoch": 30
+      }
+    },
+    {
+      "item_id": "masked",
+      "axes": {
+        "backbone": "dinov3-vits16-pretrain-lvd1689m",
+        "image_size": "448",
+        "background_aug": "normal",
+        "modality": "masked"
+      },
+      "metrics": {
+        "train_acc": 0.8022749423980713,
+        "val_acc": 0.6101544499397278,
+        "test_acc": 0.5894704461097717
+      },
+      "meta": {
+        "features": "mean_pooled_masked_patch_tokens",
+        "params": 340439,
+        "best_epoch": 30
+      }
+    },
+    {
+      "item_id": "cls+patch",
+      "axes": {
+        "backbone": "dinov3-vits16-pretrain-lvd1689m",
+        "image_size": "448",
+        "background_aug": "normal",
+        "modality": "cls+patch"
+      },
+      "metrics": {
+        "train_acc": 0.8413796424865723,
+        "val_acc": 0.6383610963821411,
+        "test_acc": 0.6026836037635803
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_patch_tokens",
+        "params": 570071,
+        "best_epoch": 18
+      }
+    },
+    {
+      "item_id": "cls+masked",
+      "axes": {
+        "backbone": "dinov3-vits16-pretrain-lvd1689m",
+        "image_size": "448",
+        "background_aug": "normal",
+        "modality": "cls+masked"
+      },
+      "metrics": {
+        "train_acc": 0.8211458325386047,
+        "val_acc": 0.6309382915496826,
+        "test_acc": 0.6145651936531067
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_masked_patch_tokens",
+        "params": 570071,
+        "best_epoch": 17
+      }
+    }
+  ],
+  "notes": ""
+}

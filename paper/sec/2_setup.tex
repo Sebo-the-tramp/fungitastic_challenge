@@ -17,6 +17,13 @@ The paper structure in the README distinguishes three segmentation regimes: no s
 \paragraph{Backbone families.}
 The top-line teaser plots are defined over the DINOv3 suite. The broader backbone ablation requested in the README spans CLIP, SigLIP, MAE, DINOv1, DINOv2, DINOv3, and InternViT. At the current repo state, the completed runs populate only the DINOv3 ViT-7B slice.
 
+\paragraph{Multi-backbone fusion.}
+The draft now reserves a dedicated block for testing whether diversity matters more than quantity when several frozen backbones are combined. For backbone $m$, let $x_m$ denote the descriptor and let $W_m x_m \in \mathbb{R}^d$ be its learned projection into a shared space. A lightweight gate predicts a scalar or branch weight $\alpha_m$, and the fused representation is
+\[
+z = \sum_{m=1}^{M} \alpha_m W_m x_m .
+\]
+This is the minimal version of the user-facing idea ``project everything to the same space and gate it with $\alpha$''. The corresponding ablation should compare single backbones, diverse pairs such as \texttt{DINO+SigLIP}, larger mixtures, and the full ensemble to test whether diverse combinations saturate most of the gain.
+
 \paragraph{Classifier families.}
 The classifier ablation requested in the README includes prototype, $k$-NN, linear probe, and MLP. The completed evidence currently covers MLP runs at 224 and 448, plus a 224 $k$-NN sweep. Prototype and linear-probe tables are still pending.
 

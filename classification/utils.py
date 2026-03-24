@@ -43,7 +43,7 @@ def load_shards(data_path: Path) -> dict[str, torch.Tensor | None]:
             has_register_tokens = shard_register_tokens is not None
         assert has_register_tokens == (shard_register_tokens is not None)
         if shard_register_tokens is not None:
-            register_tokens.append(shard_register_tokens.flatten(1).float())
+            register_tokens.append(shard_register_tokens.float())
         mean_pooled_patch_tokens.append(shard_data["mean_pooled_patch_tokens"].float())
         mean_pooled_masked_patch_tokens.append(shard_data["mean_pooled_masked_patch_tokens"].float())
         if "patch_features" in shard_data and shard_data["patch_features"] is not None:

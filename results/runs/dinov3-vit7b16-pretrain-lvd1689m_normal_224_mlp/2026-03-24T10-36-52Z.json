@@ -1,8 +1,8 @@
 {
-  "run_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_224_mlp_2026-03-23T11:06:17Z",
+  "run_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_224_mlp_2026-03-24T10:36:52Z",
   "experiment_id": "dinov3-vit7b16-pretrain-lvd1689m_normal_224_mlp",
   "script": "classification/mlp_cls_ablation.py",
-  "timestamp": "2026-03-23T11:06:17Z",
+  "timestamp": "2026-03-24T10:36:52Z",
   "meta": {
     "seed": 7,
     "device": "cuda",
@@ -28,7 +28,7 @@
       "item_id": "cls",
       "axes": {
         "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
-        "image_size": 224,
+        "image_size": "224",
         "background_aug": "normal",
         "modality": "cls"
       },
@@ -39,7 +39,6 @@
       },
       "meta": {
         "features": "cls_tokens",
-        "normalize": "no",
         "params": 1290711,
         "best_epoch": 14
       }
@@ -48,7 +47,7 @@
       "item_id": "patch",
       "axes": {
         "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
-        "image_size": 224,
+        "image_size": "224",
         "background_aug": "normal",
         "modality": "patch"
       },
@@ -59,7 +58,6 @@
       },
       "meta": {
         "features": "mean_pooled_patch_tokens",
-        "normalize": "no",
         "params": 1290711,
         "best_epoch": 25
       }
@@ -68,7 +66,7 @@
       "item_id": "masked",
       "axes": {
         "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
-        "image_size": 224,
+        "image_size": "224",
         "background_aug": "normal",
         "modality": "masked"
       },
@@ -79,7 +77,6 @@
       },
       "meta": {
         "features": "mean_pooled_masked_patch_tokens",
-        "normalize": "no",
         "params": 1290711,
         "best_epoch": 18
       }
@@ -88,7 +85,7 @@
       "item_id": "cls+patch",
       "axes": {
         "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
-        "image_size": 224,
+        "image_size": "224",
         "background_aug": "normal",
         "modality": "cls+patch"
       },
@@ -99,36 +96,15 @@
       },
       "meta": {
         "features": "cls_tokens+mean_pooled_patch_tokens",
-        "normalize": "no",
         "params": 2470615,
         "best_epoch": 14
-      }
-    },
-    {
-      "item_id": "cls+patch_norm",
-      "axes": {
-        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
-        "image_size": 224,
-        "background_aug": "normal",
-        "modality": "cls+patch_norm"
-      },
-      "metrics": {
-        "train_acc": 0.8984116911888123,
-        "val_acc": 0.74614018201828,
-        "test_acc": 0.7106422185897827
-      },
-      "meta": {
-        "features": "cls_tokens+mean_pooled_patch_tokens",
-        "normalize": "yes",
-        "params": 2470615,
-        "best_epoch": 30
       }
     },
     {
       "item_id": "cls+masked",
       "axes": {
         "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
-        "image_size": 224,
+        "image_size": "224",
         "background_aug": "normal",
         "modality": "cls+masked"
       },
@@ -139,29 +115,8 @@
       },
       "meta": {
         "features": "cls_tokens+mean_pooled_masked_patch_tokens",
-        "normalize": "no",
         "params": 2470615,
         "best_epoch": 14
-      }
-    },
-    {
-      "item_id": "cls+masked_norm",
-      "axes": {
-        "backbone": "dinov3-vit7b16-pretrain-lvd1689m",
-        "image_size": 224,
-        "background_aug": "normal",
-        "modality": "cls+masked_norm"
-      },
-      "metrics": {
-        "train_acc": 0.8587828278541565,
-        "val_acc": 0.7342637181282043,
-        "test_acc": 0.7240602374076843
-      },
-      "meta": {
-        "features": "cls_tokens+mean_pooled_masked_patch_tokens",
-        "normalize": "yes",
-        "params": 2470615,
-        "best_epoch": 24
       }
     }
   ],

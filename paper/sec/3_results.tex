@@ -2,11 +2,12 @@
 \label{sec:results}
 
 \paragraph{Result flow.}
-After the teaser comparisons, the body of the paper should answer two follow-up questions from the README: which frozen backbone family is strongest, and which lightweight classifier extracts the most from those features. The next two figure slots are placed in that order so the paper reads from top-line segmentation comparisons to broader backbone and classifier ablations before zooming into the currently completed DINOv3 slice.
+After the teaser comparisons, the body of the paper should answer three follow-up questions from the README and the planned fusion extension: which frozen backbone family is strongest, whether diversity matters more than quantity when combining backbones, and which lightweight classifier extracts the most from those features. The next blocks are placed in that order so the paper reads from top-line segmentation comparisons to broader backbone and fusion ablations, then to the classifier comparison, before zooming into the currently completed DINOv3 slice.
 
 \begin{center}
     \includegraphics[width=\linewidth]{example-image-c}
-    \captionof{figure}{Placeholder for the backbone-family ablation using single-vector descriptors or equivalent class-token features. This slot is intended for the comparison across CLIP, SigLIP, MAE, DINOv1, DINOv2, DINOv3, and InternViT.}
+    \captionsetup{type=figure}
+    \caption{Placeholder for the backbone-family ablation using single-vector descriptors or equivalent class-token features. This slot is intended for the comparison across CLIP, SigLIP, MAE, DINOv1, DINOv2, DINOv3, and InternViT.}
     \label{fig:backbone-ablation}
 \end{center}
 
@@ -14,13 +15,35 @@ After the teaser comparisons, the body of the paper should answer two follow-up 
 \Cref{fig:backbone-ablation} is the right next plot after the teaser because it broadens the question from segmentation within DINOv3 to representation choice across feature families. This is where the paper should establish whether the DINOv3 pattern survives when compared against CLIP, SigLIP, MAE, DINOv1, DINOv2, and InternViT.
 
 \begin{center}
+    \small
+    \begin{tabular}{p{0.3\linewidth}p{0.56\linewidth}}
+        \toprule
+        Combination & Intended reading \\
+        \midrule
+        single backbone & baseline transfer strength \\
+        DINO + SigLIP & diversity gain from complementary features \\
+        DINO + SigLIP + CLIP & marginal gain from a third family \\
+        all DINO variants & redundancy versus family diversity \\
+        full ensemble & quantity ceiling \\
+        \bottomrule
+    \end{tabular}
+    \captionsetup{type=table}
+    \caption{Placeholder for the multi-backbone fusion ablation. Each backbone is projected to a shared space and weighted by a learned gate $\alpha_m$. The main question is whether a diverse pair such as \texttt{DINO+SigLIP} already captures most of the gain from larger mixtures.}
+    \label{tab:fusion-ablation}
+\end{center}
+
+\paragraph{Fusion-ablation placeholder.}
+\Cref{tab:fusion-ablation} is where the paper should test the concrete hypothesis that diversity matters more than quantity. If \texttt{DINO+SigLIP} already closes most of the gap to the full ensemble, then the story is not ``add more models'' but ``add complementary models and stop early''.
+
+\begin{center}
     \includegraphics[width=\linewidth]{example-image}
-    \captionof{figure}{Placeholder for the classifier ablation. This slot is intended for the comparison among prototype, $k$-NN, linear probe, and MLP under the chosen feature settings.}
+    \captionsetup{type=figure}
+    \caption{Placeholder for the classifier ablation. This slot is intended for the comparison among prototype, $k$-NN, linear probe, and MLP under the chosen feature settings.}
     \label{fig:classifier-ablation}
 \end{center}
 
 \paragraph{Classifier-ablation placeholder.}
-\Cref{fig:classifier-ablation} should follow the backbone comparison because classifier choice is easiest to interpret once the feature family and descriptor construction have been introduced. This plot will show whether the current mask-fusion trend is specific to MLPs or whether it persists for prototype, $k$-NN, and linear probes as well.
+\Cref{fig:classifier-ablation} should follow the backbone and fusion comparisons because classifier choice is easiest to interpret once the feature family and descriptor construction have been introduced. This plot will show whether the current mask-fusion trend is specific to MLPs or whether it persists for prototype, $k$-NN, and linear probes as well.
 
 \begin{table*}[t]
     \centering
@@ -69,4 +92,4 @@ After the teaser comparisons, the body of the paper should answer two follow-up 
 The current classifier comparison is only partially populated, but the 224 $k$-NN sweep already preserves the same rough ranking. \Cref{tab:knn-results} shows that \texttt{cls+masked} again gives the best result, narrowly exceeding \texttt{cls}, while \texttt{patch} is far behind. This is useful because it suggests that the segmentation effect is not unique to the MLP head.
 
 \paragraph{What is still missing from the final story.}
-The README-level paper is larger than the completed slice. The 200-class oracle teaser still needs its final plot export, the 2000-class SAM-3 teaser is still a placeholder, the cross-family backbone sweep has no numbers yet, and the classifier table still needs prototype and linear-probe results. The current paper therefore reports a real first result slice while making the missing pieces explicit instead of leaving the manuscript structurally narrow.
+The README-level paper is larger than the completed slice. The 200-class oracle teaser still needs its final plot export, the 2000-class SAM-3 teaser is still a placeholder, the cross-family backbone sweep has no numbers yet, the new multi-backbone fusion ablation is still a placeholder, and the classifier table still needs prototype and linear-probe results. The current paper therefore reports a real first result slice while making the missing pieces explicit instead of leaving the manuscript structurally narrow.

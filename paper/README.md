@@ -29,6 +29,7 @@ The draft is now organized around the paper structure in `../README.md`:
 - teaser A: 200-class oracle-segmentation comparison across the DINOv3 suite with MLP classification
 - teaser B: 2000-class SAM-3 comparison across the DINOv3 suite with MLP classification
 - backbone ablation: CLIP, SigLIP, MAE, DINOv1, DINOv2, DINOv3, InternViT
+- fusion ablation: shared-space gated combinations, with diversity-vs-quantity comparisons such as DINO+SigLIP versus larger mixtures
 - classifier ablation: prototype, k-NN, linear probe, MLP
 
 Current completed evidence already written into the draft:

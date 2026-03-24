@@ -1,0 +1,124 @@
+{
+  "run_id": "dinov3-vith16plus-pretrain-lvd1689m_normal_224_mlp_2026-03-24T10:34:28Z",
+  "experiment_id": "dinov3-vith16plus-pretrain-lvd1689m_normal_224_mlp",
+  "script": "classification/mlp_cls_ablation.py",
+  "timestamp": "2026-03-24T10:34:28Z",
+  "meta": {
+    "seed": 7,
+    "device": "cuda",
+    "batch_size": 64,
+    "learning_rate": 0.0003,
+    "weight_decay": 0.0001,
+    "max_epochs": 200,
+    "patience": 30,
+    "min_delta": 0.0001,
+    "val_fraction": 0.15,
+    "projection_dim": 256,
+    "hidden_dim": 512,
+    "num_classes": 215,
+    "num_train_samples": 19077,
+    "num_val_samples": 3368,
+    "num_test_samples": 9763,
+    "model_train": "facebook/dinov3-vith16plus-pretrain-lvd1689m/bfloat16_normal_224/train",
+    "model_val": "facebook/dinov3-vith16plus-pretrain-lvd1689m/bfloat16_normal_224/val",
+    "model_test": "facebook/dinov3-vith16plus-pretrain-lvd1689m/bfloat16_normal_224/test"
+  },
+  "rows": [
+    {
+      "item_id": "cls",
+      "axes": {
+        "backbone": "dinov3-vith16plus-pretrain-lvd1689m",
+        "image_size": "224",
+        "background_aug": "normal",
+        "modality": "cls"
+      },
+      "metrics": {
+        "train_acc": 0.8889762163162231,
+        "val_acc": 0.7473278045654297,
+        "test_acc": 0.7082864046096802
+      },
+      "meta": {
+        "features": "cls_tokens",
+        "params": 569815,
+        "best_epoch": 19
+      }
+    },
+    {
+      "item_id": "patch",
+      "axes": {
+        "backbone": "dinov3-vith16plus-pretrain-lvd1689m",
+        "image_size": "224",
+        "background_aug": "normal",
+        "modality": "patch"
+      },
+      "metrics": {
+        "train_acc": 0.8428997993469238,
+        "val_acc": 0.6570665240287781,
+        "test_acc": 0.6170234680175781
+      },
+      "meta": {
+        "features": "mean_pooled_patch_tokens",
+        "params": 569815,
+        "best_epoch": 33
+      }
+    },
+    {
+      "item_id": "masked",
+      "axes": {
+        "backbone": "dinov3-vith16plus-pretrain-lvd1689m",
+        "image_size": "224",
+        "background_aug": "normal",
+        "modality": "masked"
+      },
+      "metrics": {
+        "train_acc": 0.8275409936904907,
+        "val_acc": 0.7182304263114929,
+        "test_acc": 0.6992727518081665
+      },
+      "meta": {
+        "features": "mean_pooled_masked_patch_tokens",
+        "params": 569815,
+        "best_epoch": 23
+      }
+    },
+    {
+      "item_id": "cls+patch",
+      "axes": {
+        "backbone": "dinov3-vith16plus-pretrain-lvd1689m",
+        "image_size": "224",
+        "background_aug": "normal",
+        "modality": "cls+patch"
+      },
+      "metrics": {
+        "train_acc": 0.9044398665428162,
+        "val_acc": 0.7473278045654297,
+        "test_acc": 0.7018334865570068
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_patch_tokens",
+        "params": 1028823,
+        "best_epoch": 18
+      }
+    },
+    {
+      "item_id": "cls+masked",
+      "axes": {
+        "backbone": "dinov3-vith16plus-pretrain-lvd1689m",
+        "image_size": "224",
+        "background_aug": "normal",
+        "modality": "cls+masked"
+      },
+      "metrics": {
+        "train_acc": 0.8870367407798767,
+        "val_acc": 0.7440617680549622,
+        "test_acc": 0.7095155119895935
+      },
+      "meta": {
+        "features": "cls_tokens+mean_pooled_masked_patch_tokens",
+        "params": 1028823,
+        "best_epoch": 18
+      }
+    }
+  ],
+  "notes": ""
+}
