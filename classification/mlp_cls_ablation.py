@@ -31,13 +31,21 @@ MIN_DELTA = 1e-4
 VAL_FRACTION = 0.15
 PROJECTION_DIM = 256
 HIDDEN_DIM = 512
+NUM_REGISTER_TOKENS = 4
 
-EXPERIMENTS: list[tuple[str, tuple[str, ...]]] = [
+REGISTER_FEATURE_NAMES = tuple(f"register_tokens_{index}" for index in range(NUM_REGISTER_TOKENS))
+BASE_EXPERIMENTS: list[tuple[str, tuple[str, ...]]] = [
     ("cls", ("cls_tokens",)),
     ("patch", ("mean_pooled_patch_tokens",)),
     ("masked", ("mean_pooled_masked_patch_tokens",)),
     ("cls+patch", ("cls_tokens", "mean_pooled_patch_tokens")),
     ("cls+masked", ("cls_tokens", "mean_pooled_masked_patch_tokens")),
+]
+REGISTER_EXPERIMENTS: list[tuple[str, tuple[str, ...]]] = [
+    (f"cls+register_{index}", ("cls_tokens", feature_name))
+    for index, feature_name in enumerate(REGISTER_FEATURE_NAMES)
+] + [
+    ("cls+masked+register_3", ("cls_tokens", "mean_pooled_masked_patch_tokens", "register_tokens_3")),
 ]
 
 CONSOLE = Console()
@@ -302,6 +310,26 @@ def main() -> None:
         "mean_pooled_patch_tokens": test_data["mean_pooled_patch_tokens"].float(),
         "mean_pooled_masked_patch_tokens": test_data["mean_pooled_masked_patch_tokens"].float(),
     }
+    experiments = BASE_EXPERIMENTS
+    register_meta: dict[str, int] = {}
+    if train_data["register_tokens"] is not None:
+        assert val_data["register_tokens"] is not None
+        assert test_data["register_tokens"] is not None
+        train_register_tokens = torch.cat([train_data["register_tokens"], val_data["register_tokens"]]).float()
+        test_register_tokens = test_data["register_tokens"].float()
+        train_features |= {
+            name: train_register_tokens[:, index, :]
+            for index, name in enumerate(REGISTER_FEATURE_NAMES)
+        }
+        test_features |= {
+            name: test_register_tokens[:, index, :]
+            for index, name in enumerate(REGISTER_FEATURE_NAMES)
+        }
+        experiments = [*BASE_EXPERIMENTS, *REGISTER_EXPERIMENTS]
+        register_meta = {
+            "num_register_tokens": int(train_register_tokens.shape[1]),
+            "register_feature_dim": int(train_register_tokens.shape[2]),
+        }
 
     train_labels_raw = torch.cat([train_data["labels"], val_data["labels"]])
     train_labels, test_labels = remap_labels_from_reference(train_labels_raw, test_data["labels"])
@@ -325,10 +353,11 @@ def main() -> None:
         "model_train": str(MODEL_TRAIN),
         "model_val": str(MODEL_VAL),
         "model_test": str(MODEL_TEST),
+        **register_meta,
     }
 
     results = []
-    for name, feature_names in EXPERIMENTS:
+    for name, feature_names in experiments:
         results.append(
             run_experiment(
                 name=name,

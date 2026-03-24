@@ -30,13 +30,13 @@ MATPLOTLIB_MARKERS = {
     "cls+patch": "^",
     "cls+masked": "X",
 }
-TITLE_SIZE = 30
-LABEL_SIZE = 24
-TICK_SIZE = 19
-LEGEND_SIZE = 18
-LINE_WIDTH = 3.2
-MARKER_SIZE = 12
-MATPLOTLIB_FIGSIZE = (20, 10.5)
+TITLE_SIZE = 60
+LABEL_SIZE = 48
+TICK_SIZE = 38
+LEGEND_SIZE = 54
+LINE_WIDTH = 4.2
+MARKER_SIZE = 18
+MATPLOTLIB_FIGSIZE = (32, 18)
 BACKBONE_LABELS = {
     "vit7b16": "ViT-7B",
     "vits16": "ViT-S",
@@ -154,19 +154,27 @@ def make_matplotlib(
             marker=MATPLOTLIB_MARKERS[item],
             linewidth=LINE_WIDTH,
             markersize=MARKER_SIZE,
-            markeredgewidth=1.5,
+            markeredgewidth=2.5,
             markeredgecolor="#ffffff",
             label=item,
             color=COLORS[item],
         )
-    ax.set_xticks(x, labels, rotation=24, ha="right")
+    ax.set_xticks(x, labels, rotation=28, ha="right")
     ax.set_ylabel("Test accuracy (%)")
     # ax.set_xlabel("DINOv3 backbone / input resolution sorted from lowest to highest mean test accuracy")
     # ax.set_title("MLP modality comparison across DINOv3 backbones and resolutions")
-    ax.legend(ncols=len(items), frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.28))
+    ax.legend(
+        ncols=len(items),
+        frameon=False,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.43),
+        handlelength=1.6,
+        columnspacing=1.6,
+        handletextpad=0.5,
+    )
     ax.grid(True, axis="y", color="#d1d5db", linewidth=1.0)
     ax.grid(False, axis="x")
-    fig.subplots_adjust(bottom=0.25, top=0.84)
+    fig.subplots_adjust(bottom=0.43, top=0.9, left=0.11, right=0.99)
     return fig, ax
 
 
@@ -185,7 +193,7 @@ def main() -> None:
     record_map, matplotlib_labels = build_plot_data(record_map, experiments)
 
     matplotlib_fig, _ = make_matplotlib(record_map, experiments, items, matplotlib_labels)
-    matplotlib_fig.savefig(MATPLOTLIB_PATH, dpi=220, bbox_inches="tight")
+    matplotlib_fig.savefig(MATPLOTLIB_PATH, dpi=220, bbox_inches="tight", pad_inches=0.25)
     print(f"Saved {MATPLOTLIB_PATH}")
     plt.close(matplotlib_fig)
 
