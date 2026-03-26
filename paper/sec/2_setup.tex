@@ -11,6 +11,21 @@
 \paragraph{Dataset and evaluation scopes.}
 The README-level paper is organized around two scopes: a 200-class oracle-mask teaser and a 2000-class SAM-3 teaser. The currently completed closed-set slice in the repo uses extracted features for 215 classes. According to the saved run metadata, this slice contains 22,445 train/validation samples and 9,763 test samples. For the MLP runs, the stored \texttt{train} and \texttt{val} folders are merged and re-split into 19,077 training and 3,368 validation samples for early stopping. For $k$-NN, the full 22,445-sample train/validation pool is used as the retrieval bank.
 
+\begin{figure*}[t]
+    \centering
+    \begin{tabular}{@{}ccc@{}}
+        \includegraphics[width=0.31\linewidth]{media/class_distribution/train_class_distribution.png} &
+        \includegraphics[width=0.31\linewidth]{media/class_distribution/val_class_distribution.png} &
+        \includegraphics[width=0.31\linewidth]{media/class_distribution/test_class_distribution.png} \\
+        \small Train & \small Val & \small Test
+    \end{tabular}
+    \caption{Class-frequency distributions for the dataset splits used in the current study. All three splits are visibly long-tailed, so aggregate top-1 accuracy should be interpreted together with the frequency profile rather than in isolation.}
+    \label{fig:class-distribution}
+\end{figure*}
+
+\paragraph{Class-frequency skew.}
+The completed closed-set slice is strongly long-tailed, which is why the paper should explicitly report the split-wise label distributions in \Cref{fig:class-distribution}. In the merged train/validation pool used for learning, class counts range from 3 to 1,164 samples per class, with mean 104 and median 44; the top 10 classes already account for 29.8\% of all examples. The held-out test split is similarly skewed, ranging from 1 to 641 samples per class, with mean 50 and median 21, and its top 10 classes cover 33.5\% of the samples. This matters because a single overall accuracy number otherwise hides whether gains come from broad improvement or from already well-represented classes.
+
 \paragraph{Segmentation conditions.}
 The paper structure in the README distinguishes three segmentation regimes: no segmentation, oracle segmentation, and SAM-3 segmentation. In descriptor terms, this corresponds to global image tokens, whole-image pooled patch tokens, and mask-aware pooled patch tokens where the pooling weights come from either ground-truth masks or predicted masks. The README also calls out register-token features as an additional descriptor to test alongside whole-image and masked pooling.
 
@@ -31,4 +46,4 @@ The classifier ablation requested in the README includes prototype, $k$-NN, line
 Within the completed DINOv3 slice, the current paper writes up the descriptors that already exist in the repo: \texttt{cls}, \texttt{patch}, \texttt{masked}, \texttt{cls+patch}, \texttt{cls+masked}, and exploratory 224-only \texttt{register} and \texttt{cls+register} rows from the latest rerun. These variants directly implement the README idea of comparing whole-image, segmented, and register-style descriptors.
 
 \paragraph{Metric.}
-The dashboard tracks top-1 accuracy, so that is the metric reported here. Stratified analyses by class frequency, mask area, and hard species pairs remain part of the planned follow-up rather than the completed draft.
+The dashboard tracks top-1 accuracy, so that is the metric reported here. We now also report the split-wise class-frequency distributions because the completed slice is strongly imbalanced. Stratified analyses by class frequency, mask area, and hard species pairs remain part of the planned follow-up rather than the completed draft.

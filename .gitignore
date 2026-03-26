@@ -1,4 +1,6 @@
 **.pyc
+**.json
+**.png
 __pycache__/
 
 data_processed/**

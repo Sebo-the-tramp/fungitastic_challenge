@@ -13,9 +13,9 @@ MODELS=(
 
 for CURRENT_MODEL_NAME in "${MODELS[@]}"; do
     # image size -> 224
-    gbatch --gpus 1 --time 2:00:00 --name classify-mlp BACKBONE="$CURRENT_MODEL_NAME" IMAGE_SIZE=224 "$PYTHON" mlp_cls_ablation.py
+    gbatch --gpus 1 --time 2:00:00 --name classify-mlp-${CURRENT_MODEL_NAME} BACKBONE="$CURRENT_MODEL_NAME" IMAGE_SIZE=224 "$PYTHON" mlp_cls_ablation.py
 
     # image size -> 448
-    gbatch --gpus 1 --time 2:00:00 --name classify-mlp BACKBONE="$CURRENT_MODEL_NAME" IMAGE_SIZE=448 "$PYTHON" mlp_cls_ablation.py
+    gbatch --gpus 1 --time 2:00:00 --name classify-mlp-${CURRENT_MODEL_NAME} BACKBONE="$CURRENT_MODEL_NAME" IMAGE_SIZE=448 "$PYTHON" mlp_cls_ablation.py
     
 done
