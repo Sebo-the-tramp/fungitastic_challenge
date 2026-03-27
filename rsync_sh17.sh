@@ -1,0 +1,1 @@
+rsync -avz ./data_processed scavada@10.10.151.17:/home/scavada/projects/datasets/FungiTastic
