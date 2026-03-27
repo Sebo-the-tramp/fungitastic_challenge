@@ -18,7 +18,7 @@ from utils import read_segments, polygon_to_mask
 PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2")
 DATASET_ROOT = Path("/data0/sebastian.cavada/datasets/FungiTastic")
 OUTPUT_ROOT = PROJECT_ROOT / "data_processed"
-MODEL_NAME = os.environ.get("MODEL_NAME", "facebook/dinov3-vit7b16-pretrain-lvd1689m")
+MODEL_NAME = os.environ.get("MODEL_NAME", "facebook/dinov2-with-registers-small")
 OUTPUT_NAME = os.environ.get("OUTPUT_NAME", "")
 BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "64"))
 NUM_WORKERS = int(os.environ.get("NUM_WORKERS", "8"))
@@ -31,12 +31,10 @@ from dataset.mask_fungi import MaskFungiTastic
 from dataset.utils.mask_vis import get_image_shape, resize_mask_to_image
 
 HUGGINGFACE_MODELS = [
-    "facebook/dinov3-vits16-pretrain-lvd1689m",
-    "facebook/dinov3-vits16plus-pretrain-lvd1689m",
-    "facebook/dinov3-vitb16-pretrain-lvd1689m",
-    "facebook/dinov3-vitl16-pretrain-lvd1689m",
-    "facebook/dinov3-vith16plus-pretrain-lvd1689m",
-    "facebook/dinov3-vit7b16-pretrain-lvd1689m",
+    "facebook/dinov2-with-registers-small",
+    "facebook/dinov2-with-registers-base",
+    "facebook/dinov2-with-registers-large",
+    "facebook/dinov2-with-registers-giant",
 ]
 
 SPLIT = os.environ.get("SPLIT", "train")
@@ -51,10 +49,6 @@ SEG_TASK = "binary"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 PIN_MEMORY = DEVICE == "cuda"
 BACKGROUND_TYPES = [
-    # "crop",
-    # "crop_black",
-    # "masked_black",
-    # "masked_blurred", # not needed for now what I am doing is a different analysis now
     "normal",
 ]
 BACKGROUND = "normal"
@@ -122,7 +116,7 @@ def flush_shard(
         "mean_pooled_patch_tokens": torch.cat(mean_pooled_patch_tokens, dim=0).contiguous(), 
         "mean_pooled_gt_masked_patch_tokens": torch.cat(mean_pooled_gt_masked_patch_tokens, dim=0).contiguous(),
         "mean_pooled_sam_masked_patch_tokens": torch.cat(mean_pooled_sam_masked_patch_tokens, dim=0).contiguous(),
-        "patch_features": torch.cat(patch_feature_batches, dim=0).contiguous() if patch_feature_batches else None,        
+        "patch_features": torch.cat(patch_feature_batches, dim=0).contiguous() if patch_feature_batches else None,
     }
     torch.save(shard, output_dir / f"shard_{shard_index:05d}.pt")
     file_paths.clear()
@@ -143,6 +137,7 @@ def seed_everything(seed: int) -> None:
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
+
 def get_bounding_boxes(bool_mask: np.ndarray) -> list[tuple[int, int, int, int]]:
     uint8_mask = (bool_mask.astype(np.uint8)) * 255
     contours, _ = cv2.findContours(uint8_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -151,6 +146,7 @@ def get_bounding_boxes(bool_mask: np.ndarray) -> list[tuple[int, int, int, int]]
     bounding_boxes = sorted(bounding_boxes, key=lambda box: (box[1], box[0], box[3], box[2]))
     filtered_boxes = [box for box in bounding_boxes if box[2] * box[3] >= MIN_BOX_AREA]
     return filtered_boxes if filtered_boxes else [max(bounding_boxes, key=lambda box: box[2] * box[3])]
+
 
 def pre_process_images(images: list[Image.Image], masks: list[list[bool]], labels: list[int], background: str) -> list[Image.Image]:
     if background == "normal":
@@ -170,7 +166,7 @@ def pre_process_images(images: list[Image.Image], masks: list[list[bool]], label
         masked_images = []
         for img, msk in zip(images, masks):
             msk_uint8 = msk.to(torch.uint8) * 255
-    
+
             # 2. Convert directly to a PIL Image 
             mask_pil = TF.to_pil_image(msk_uint8).convert("L")
             
@@ -182,7 +178,7 @@ def pre_process_images(images: list[Image.Image], masks: list[list[bool]], label
 
             masked_images.append(masked_img)
         return masked_images, labels
-     
+
     elif background == "crop":
 
         cropped_imges = []
@@ -261,10 +257,11 @@ def main() -> None:
     )
    
     assert MODEL_NAME in HUGGINGFACE_MODELS, MODEL_NAME
+
     processor = AutoImageProcessor.from_pretrained(MODEL_NAME, size={"height": IMAGE_SIZE, "width": IMAGE_SIZE})
+
     model = AutoModel.from_pretrained(
         MODEL_NAME,
-        # device_map={"": 0},
         device_map="auto",
         torch_dtype=MODEL_LOAD_DTYPE,
         image_size=IMAGE_SIZE,
