@@ -30,7 +30,7 @@ sys.path.append(str(PROJECT_ROOT / "FungiTastic"))
 from dataset.mask_fungi import MaskFungiTastic
 from dataset.utils.mask_vis import get_image_shape, resize_mask_to_image
 
-HUGGINGFACE_MODELS = [
+HUGGINGFACE_MODELS = [    
     "facebook/dinov2-with-registers-small",
     "facebook/dinov2-with-registers-base",
     "facebook/dinov2-with-registers-large",
@@ -210,7 +210,7 @@ def compute_mean_pooled_masked_patch_tokens(
 ) -> torch.Tensor:
     B, H_p, W_p, D = patch_features.shape
 
-    print(f"Mask shape 0 {masks[0].shape}, expected ({image_size[1]}, {image_size[0]})")
+    # print(f"Mask shape 0 {masks[0].shape}, expected ({image_size[1]}, {image_size[0]})")
 
     masks_resized = [torch.from_numpy(resize_mask_to_image(mask[0].numpy(), image_size)) for mask in masks]
 
@@ -243,7 +243,7 @@ def compute_mean_pooled_masked_patch_tokens(
 
 def main() -> None:
     seed_everything(SEED)
-    torch.set_grad_enabled(False)
+    # torch.set_grad_enabled(False)
     
     dataset = MaskFungiTastic(
         root=str(DATASET_ROOT),
@@ -260,11 +260,12 @@ def main() -> None:
 
     processor = AutoImageProcessor.from_pretrained(MODEL_NAME, size={"height": IMAGE_SIZE, "width": IMAGE_SIZE})
 
+    # Keep the pretrained config image_size. Dinov2 interpolates positional
+    # embeddings at forward time for resized inputs like 448x448.
     model = AutoModel.from_pretrained(
         MODEL_NAME,
         device_map="auto",
         torch_dtype=MODEL_LOAD_DTYPE,
-        image_size=IMAGE_SIZE,
     ).eval()
     dataloader_kwargs = {
         "batch_size": BATCH_SIZE,
@@ -277,7 +278,8 @@ def main() -> None:
         dataloader_kwargs["prefetch_factor"] = 2
     dataloader = DataLoader(dataset, **dataloader_kwargs)
     save_patch_features = False
-    output_model_root = OUTPUT_ROOT / MODEL_NAME / f"{DTYPE}_{BACKGROUND}_{IMAGE_SIZE}{"_patches"if save_patch_features else ""}".replace("torch.", "") / SPLIT    
+    patch_suffix = "_patches" if save_patch_features else ""
+    output_model_root = OUTPUT_ROOT / MODEL_NAME / f"{DTYPE}_{BACKGROUND}_{IMAGE_SIZE}{patch_suffix}".replace("torch.", "") / SPLIT
     shard_index = 0
     shard_file_paths: list[str] = []
     shard_labels: list[int | None] = []
@@ -294,9 +296,9 @@ def main() -> None:
         for images, gt_masks, labels, file_paths in tqdm(dataloader, desc="Processing batches", unit="batch"):
 
             images, labels = pre_process_images(images, gt_masks, labels, BACKGROUND)
-            print(images[0].size)
+            # print(images[0].size)
             itorchuts = processor(images=images, return_tensors="pt")
-            print(itorchuts["pixel_values"].shape)
+            # print(itorchuts["pixel_values"].shape)
             
             moved_itorchuts = {}
             for key, value in itorchuts.items():

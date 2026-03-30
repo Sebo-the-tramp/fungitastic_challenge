@@ -51,13 +51,13 @@ SEG_TASK = "binary"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 PIN_MEMORY = DEVICE == "cuda"
 BACKGROUND_TYPES = [
-    # "crop",
-    # "crop_black",
-    # "masked_black",
-    # "masked_blurred", # not needed for now what I am doing is a different analysis now
+    "crop",
+    "crop_black",
+    "masked_black",
+    "masked_blurred",
     "normal",
 ]
-BACKGROUND = "normal"
+BACKGROUND = os.environ.get("BACKGROUND", "crop")
 MIN_BOX_AREA = 2500
 
 USE_SAM_MASKS = True
@@ -147,7 +147,8 @@ def get_bounding_boxes(bool_mask: np.ndarray) -> list[tuple[int, int, int, int]]
     uint8_mask = (bool_mask.astype(np.uint8)) * 255
     contours, _ = cv2.findContours(uint8_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     bounding_boxes = [tuple(map(int, cv2.boundingRect(contour))) for contour in contours]
-    assert bounding_boxes
+    if bounding_boxes == []:
+        return []
     bounding_boxes = sorted(bounding_boxes, key=lambda box: (box[1], box[0], box[3], box[2]))
     filtered_boxes = [box for box in bounding_boxes if box[2] * box[3] >= MIN_BOX_AREA]
     return filtered_boxes if filtered_boxes else [max(bounding_boxes, key=lambda box: box[2] * box[3])]
@@ -164,7 +165,7 @@ def pre_process_images(images: list[Image.Image], masks: list[list[bool]], label
             black_bg = Image.new(img.mode, img.size, 0) 
             masked_img = Image.composite(img, black_bg, mask_pil)
             masked_images.append(masked_img)
-        return masked_images, labels
+        return masked_images, labels, masks
     
     elif background == "masked_blurred":
         masked_images = []
@@ -181,21 +182,68 @@ def pre_process_images(images: list[Image.Image], masks: list[list[bool]], label
             masked_img = Image.composite(img, blurred_bg, mask_pil)
 
             masked_images.append(masked_img)
-        return masked_images, labels
+        return masked_images, labels, masks
      
     elif background == "crop":
-
         cropped_imges = []
         new_labels = []
+        new_masks = []
         for img, msk, label in zip(images, masks, labels):
             bounding_boxes = get_bounding_boxes(np.array(msk.squeeze(0), dtype=bool))
-            for box in bounding_boxes[:2]:  # Limit to the two largest boxes
+            if bounding_boxes == []:
+                cropped_imges.append(img)
+                new_labels.append(label)
+                new_masks.append(msk)
+                continue
+            for box in bounding_boxes[:4]:  # Limit to the two largest boxes
                 x, y, w, h = box
+
+                # let's add some padding to the box to give the model some context, but not too much to include too much background
+                padding = int(0.1 * min(w, h))
+                x = max(x - padding, 0)
+                y = max(y - padding, 0)
+                w = min(w + 2 * padding, img.width - x)
+                h = min(h + 2 * padding, img.height - y)
                 cropped_img = img.crop((x, y, x + w, y + h))
                 cropped_imges.append(cropped_img)
                 new_labels.append(label)
+                new_masks.append(msk[:, y:y+h, x:x+w])
 
-        return cropped_imges, new_labels
+        return cropped_imges, new_labels, new_masks
+
+    elif background == "crop_black":
+        cropped_imges = []
+        new_labels = []
+        new_masks = []
+        for img, msk, label in zip(images, masks, labels):
+            msk_uint8 = msk.to(torch.uint8) * 255
+            mask_pil = TF.to_pil_image(msk_uint8).convert("L")
+            black_bg = Image.new(img.mode, img.size, 0) 
+            masked_img = Image.composite(img, black_bg, mask_pil)
+
+            bounding_boxes = get_bounding_boxes(np.array(msk.squeeze(0), dtype=bool))
+            if bounding_boxes == []:
+                cropped_imges.append(masked_img)
+                new_labels.append(label)
+                new_masks.append(msk)
+                continue
+            
+            for box in bounding_boxes[:4]:  # Limit to the two largest boxes
+                x, y, w, h = box
+
+                # let's add some padding to the box to give the model some context, but not too much to include too much background
+                padding = int(0.1 * min(w, h))
+                x = max(x - padding, 0)
+                y = max(y - padding, 0)
+                w = min(w + 2 * padding, img.width - x)
+                h = min(h + 2 * padding, img.height - y)
+                cropped_img = masked_img.crop((x, y, x + w, y + h))
+
+                cropped_imges.append(cropped_img)
+                new_labels.append(label)
+                new_masks.append(msk[:, y:y+h, x:x+w])
+
+        return cropped_imges, new_labels, new_masks
 
     else:
         raise ValueError(f"Unknown background type: {background}")
@@ -296,7 +344,7 @@ def main() -> None:
     with torch.inference_mode():
         for images, gt_masks, labels, file_paths in tqdm(dataloader, desc="Processing batches", unit="batch"):
 
-            images, labels = pre_process_images(images, gt_masks, labels, BACKGROUND)
+            images, labels, gt_masks = pre_process_images(images, gt_masks, labels, BACKGROUND)
             print(images[0].size)
             itorchuts = processor(images=images, return_tensors="pt")
             print(itorchuts["pixel_values"].shape)
@@ -338,12 +386,16 @@ def main() -> None:
             # there seems to be something wrong with the img_width/img_heid
             mean_pooled_gt_masked_patch_tokens = compute_mean_pooled_masked_patch_tokens(patch_features, gt_masks, patch_size, image_size=(img_width, img_height))
 
-            if USE_SAM_MASKS:
-                sam_mask = load_sam_mask_batched(file_paths, images)  # Implement this function to get SAM masks for the images
-                mean_pooled_sam_masked_patch_tokens = compute_mean_pooled_masked_patch_tokens(patch_features, sam_mask, patch_size, image_size=(img_width, img_height))
-            else:
-                raise NotImplementedError("SAM mask processing is not implemented in this version. Set USE_SAM_MASKS to False or implement the SAM mask loading and processing.")
-                mean_pooled_sam_masked_patch_tokens = torch.zeros_like(mean_pooled_gt_masked_patch_tokens)  # Placeholder if not using SAM masks
+            # can't use with the crops for now!
+            # if USE_SAM_MASKS:
+            #     sam_masks = load_sam_mask_batched(file_paths, images)  # Implement this function to get SAM masks for the images
+            #     # kind of monkey patching to get sam mask correctly resized as well
+            #     _, _, sam_masks = pre_process_images(images, sam_masks, labels, BACKGROUND)
+            #     mean_pooled_sam_masked_patch_tokens = compute_mean_pooled_masked_patch_tokens(patch_features, sam_masks, patch_size, image_size=(img_width, img_height))
+            # else:
+            #     raise NotImplementedError("SAM mask processing is not implemented in this version. Set USE_SAM_MASKS to False or implement the SAM mask loading and processing.")
+            
+            mean_pooled_sam_masked_patch_tokens = torch.zeros_like(mean_pooled_gt_masked_patch_tokens)  # Placeholder if not using SAM masks
 
             # saving or not full patch features (heavy on storage, but useful for future analysis)
             if save_patch_features:

@@ -1,10 +1,15 @@
+import os
+import sys
 import json
 import random
+import cv2
 
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-import matplotlib.pyplot as plt
+from PIL import Image
+from torch.utils.data import DataLoader
+
 
 import numpy as np
 import torch
@@ -16,6 +21,23 @@ RUNS_ROOT = ROOT / "results" / "runs"
 EXPERIMENTS_PATH = ROOT / "dashboard" / "experiments.json"
 RESULTS_PATH = ROOT / "dashboard" / "results.json"
 
+PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2")
+DATASET_ROOT = Path("/data0/sebastian.cavada/datasets/FungiTastic")
+
+DATA_SUBSET = os.environ.get("DATA_SUBSET", "all")
+SPLIT = os.environ.get("SPLIT", "train")
+DATASET_SIZE = os.environ.get("DATASET_SIZE", "720")
+TASK = os.environ.get("TASK", "closed")
+PROMPT_MODE = os.environ.get("PROMPT_MODE", "species")
+GENERIC_PROMPT = os.environ.get("GENERIC_PROMPT", "mushroom")
+BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "8"))
+NUM_WORKERS = int(os.environ.get("NUM_WORKERS", "8"))
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+MODEL_DTYPE = torch.bfloat16 if DEVICE == "cuda" else torch.float32
+PIN_MEMORY = DEVICE == "cuda"
+
+sys.path.append(str(PROJECT_ROOT / "FungiTastic"))
+from dataset.fungi import FungiTastic
 
 def seed_everything(seed: int) -> None:
     random.seed(seed)
@@ -62,18 +84,113 @@ def load_shards(data_path: Path) -> dict[str, torch.Tensor | None]:
         "patch_features": torch.cat(patch_features) if patch_features else None,
     }
 
+def collate_batch(
+    batch: list[tuple[Image.Image, np.ndarray, int | None, str, list[str]]]
+) -> tuple[list[Image.Image], list[np.ndarray], list[int | None], list[str]]:
+    images = [item[0] for item in batch]
+    # masks = [item[1] for item in batch] # this is not present
+    labels = [item[1] for item in batch]
+    file_paths = [item[2] for item in batch]
+    return images, [], labels, file_paths
+
+def read_segments(file_path):
+    segment_path = os.path.join(file_path)
+    segments = []
+    class_ids = []
+
+    if os.path.exists(segment_path):
+        with open(segment_path, "r") as f:
+            lines = f.readlines()
+
+            for line in lines:
+                parts = line.strip().split(" ")
+                class_id = int(parts[0])
+                points = parts[1:]
+                polygon = [(float(points[i]), float(points[i + 1])) for i in range(0, len(points), 2)]
+                segments.append(polygon)
+                class_ids.append(class_id)
+        
+        return segments, class_ids
+    else:
+        print(f"Segment not found for {file_path}")
+        return None
+    
+
+
+def polygon_to_mask(polygons, img_width, img_height):
+    """
+    Converts a list of polygons into a single binary mask.
+    segments: List of polygons, where each polygon is a list of (x, y) tuples.
+    """
+    # 1. Initialize an empty black mask
+    mask = np.zeros((img_height, img_width), dtype=np.uint8)
+    
+    # 2. Prepare the list of scaled polygons for OpenCV
+    all_polygons_scaled = []
+    
+    for polygon in polygons:
+        # Scale the normalized (0-1) coordinates to actual pixel values
+        pixel_coords = np.array([[x * img_width, y * img_height] for x, y in polygon], dtype=np.int32)
+        all_polygons_scaled.append(pixel_coords)
+    
+    # 3. Fill all polygons with white (255)
+    # cv2.fillPoly can take a list of arrays directly
+    if all_polygons_scaled:
+        cv2.fillPoly(mask, all_polygons_scaled, 255)
+    
+    return mask
+
+
+def load_masks(mask_path: Path) -> torch.Tensor:
+
+    dataset = FungiTastic(
+        root=str(DATASET_ROOT),
+        data_subset=DATA_SUBSET,
+        split=SPLIT,
+        size=DATASET_SIZE,
+        task=TASK,
+        transform=None,
+        seg_task="binary",
+    )
+
+    dataloader_kwargs: dict[str, Any] = {
+        "batch_size": BATCH_SIZE,
+        "shuffle": False,
+        "num_workers": NUM_WORKERS,
+        "collate_fn": collate_batch,
+        "pin_memory": PIN_MEMORY,
+    }
+    if NUM_WORKERS > 0:
+        dataloader_kwargs["persistent_workers"] = True
+        dataloader_kwargs["prefetch_factor"] = 2
+    dataloader = DataLoader(dataset, **dataloader_kwargs)
+    masks = {}
+
+    progress = tqdm(dataloader, desc="sam3", unit="batch")    
+
+    for images, gt_masks, _, file_paths in progress:        
+        for gt_mask, file_path in zip(gt_masks, file_paths):
+            file_name = file_path.split("/")[-1].replace(".JPG", ".txt")
+            mask_path = mask_path / file_name
+            segments, class_ids = read_segments(mask_path)
+            if segments is not None:
+
+                mask_sam = polygon_to_mask(segments, images[0].size[0], images[0].size[1])
+                mask_sam_tensor = torch.from_numpy(mask_sam).unsqueeze(0)
+                masks[file_name] = mask_sam_tensor
+
+    return masks
+
 
 def balance_data(data: dict[str, torch.Tensor | None], seed: int, samples_per_class: int) -> dict[str, torch.Tensor | None]:
     labels = data["labels"]
     unique_labels = torch.unique(labels)
     balanced_indices = []
-    rng = random.Random(seed)
 
     for label in unique_labels:
         label_indices = torch.where(labels == label)[0]
         if len(label_indices) > samples_per_class:
-            sampled_positions = torch.tensor(rng.sample(range(len(label_indices)), samples_per_class))
-            sampled_indices = label_indices[sampled_positions]
+            sampled_indices = torch.tensor(random.sample(label_indices.tolist(), samples_per_class))
         else:
             sampled_indices = label_indices
         balanced_indices.append(sampled_indices)
@@ -105,18 +222,18 @@ def remap_labels(y_train: torch.Tensor, y_test: torch.Tensor) -> tuple[torch.Ten
     train_labels = torch.unique(y_train, sorted=True)
     assert torch.isin(y_test, train_labels).all().item()
     label_map = {int(label): idx for idx, label in enumerate(train_labels.tolist())}
-    y_train_mapped = torch.tensor([label_map[int(label)] for label in y_train.tolist()])    
+    y_train_mapped = torch.tensor([label_map[int(label)] for label in y_train.tolist()])
     y_test_mapped = torch.tensor([label_map[int(label)] for label in y_test.tolist()])
     return y_train_mapped, y_test_mapped
 
-# def remap_labels(y_train: torch.Tensor, y_val: torch.Tensor, y_test: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-#     train_labels = torch.unique(y_train, sorted=True)
-#     assert torch.isin(y_test, train_labels).all().item()
-#     label_map = {int(label): idx for idx, label in enumerate(train_labels.tolist())}
-#     y_train_mapped = torch.tensor([label_map[int(label)] for label in y_train.tolist()])
-#     y_val_mapped = torch.tensor([label_map[int(label)] for label in y_val.tolist()])
-#     y_test_mapped = torch.tensor([label_map[int(label)] for label in y_test.tolist()])
-#     return y_train_mapped, y_val_mapped, y_test_mapped
+
+def remap_labels_val(y_train: torch.Tensor, y_test: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    train_labels = torch.unique(y_train, sorted=True)
+    assert torch.isin(y_test, train_labels).all().item()
+    label_map = {int(label): idx for idx, label in enumerate(train_labels.tolist())}
+    y_train_mapped = torch.tensor([label_map[int(label)] for label in y_train.tolist()])    
+    y_test_mapped = torch.tensor([label_map[int(label)] for label in y_test.tolist()])
+    return y_train_mapped, y_test_mapped
 
 def refresh_dashboard_results() -> None:
     RUNS_ROOT.mkdir(parents=True, exist_ok=True)
@@ -243,56 +360,3 @@ def save_run(
     run_path.write_text(json.dumps(payload, indent=2) + "\n")
     refresh_dashboard_results()
     return run_path
-
-
-def graph_results(results: dict[int, dict[int, float]], metrics = ['accuracy', 'precision', 'recall', 'f1_score']) -> None:
-    # 1. Extract and sort the x-axis values (samples per class)
-    x = sorted(list(results.keys()))
-
-    # Dictionaries to hold our calculated means and standard deviations
-    means = {m: [] for m in metrics}
-    stds = {m: [] for m in metrics}
-
-    # 3. Compute mean and standard deviation for each metric at each 'i'
-    for i in x:
-        for m in metrics:
-            # Extract the list of values for the current metric across all 100 seeds
-            metric_vals = [results[i][seed][m] for seed in results[i].keys()]
-            
-            # Calculate and store the mean and standard deviation
-            means[m].append(np.mean(metric_vals))
-            stds[m].append(np.std(metric_vals))
-
-    # Convert lists to numpy arrays for element-wise math during plotting
-    for m in metrics:
-        means[m] = np.array(means[m])
-        stds[m] = np.array(stds[m])
-
-    # 4. Set up the plot styling
-    # Using distinct colors so the shaded regions don't blend into a single muddy color
-    colors = {'accuracy': 'blue', 'precision': 'green', 'recall': 'red', 'f1_score': 'purple'}
-    labels = {'accuracy': 'Accuracy', 'precision': 'Precision', 'recall': 'Recall', 'f1_score': 'F1 Score'}
-
-    plt.figure(figsize=(10, 7)) # Made slightly larger to accommodate 4 metrics
-
-    # 5. Plot lines and shaded regions for each metric
-    for m in metrics:
-        # Plot the solid mean line
-        plt.plot(x, means[m], label=f'Mean {labels[m]}', color=colors[m])
-        
-        # Plot the shaded standard deviation region
-        plt.fill_between(x, means[m] - stds[m], means[m] + stds[m], color=colors[m], alpha=0.1)
-
-    # 6. Add formatting and labels
-    plt.title("Performance Metrics vs. Samples Per Class")
-    plt.xlabel("Samples per Class (i)")
-    plt.ylabel("Score")
-    plt.ylim(0, 1.05) # Force Y-axis to 0-1 scale 
-    plt.legend(loc="lower right")
-    plt.grid(True, linestyle='--', alpha=0.7)
-
-    # 7. Save the high-resolution image
-    plt.savefig("all_metrics_variance_plot.png", dpi=300, bbox_inches="tight")
-    plt.close()
-
-    print("Graph saved as 'all_metrics_variance_plot.png' with mean lines and shaded variance regions for all metrics.")

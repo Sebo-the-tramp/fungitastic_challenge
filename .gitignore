@@ -1,6 +1,7 @@
 **.pyc
 **.json
 **.png
-__pycache__/
+**.csv
 
+__pycache__/
 data_processed/**
