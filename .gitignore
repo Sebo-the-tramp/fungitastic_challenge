@@ -1,6 +1,8 @@
 **.pyc
 **.json
 **.png
+!paper/*.png
+!paper/**/*.png
 **.csv
 **.pth
 **.pt
