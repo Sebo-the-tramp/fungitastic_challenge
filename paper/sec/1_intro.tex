@@ -1,13 +1,38 @@
 \section{Introduction}
 
-Fine-grained fungal recognition is hard for the same reasons many ecological benchmarks are hard: subtle inter-species differences, large intra-species variation, cluttered field backgrounds, and long-tailed class frequencies. FungiTastic is a useful benchmark for this setting because it extends earlier fungi datasets with more images, richer metadata, and segmentation masks for part of the corpus \cite{Picek_2022_WACV,picek2022automatic,picek2024fungitastic}.
+Fine-grained semantic segmentation requires both precise localization and the ability to distinguish subtle inter-class differences. This challenge is particularly pronounced in domains such as mycology, where classes exhibit minimal visual differences and long-tailed distributions.
 
-The repo README now defines a broader paper than the earlier draft. Instead of asking only whether one DINOv3 token construction is best, the target manuscript studies three questions. First, how much does segmentation help, and does the answer change between no segmentation, oracle foreground masks, and SAM-3 predicted masks? Second, which frozen feature family transfers best to fungi: CLIP, SigLIP, MAE, DINOv1, DINOv2, DINOv3, or InternViT? Third, which lightweight classifier extracts the most from those features: prototype, $k$-NN, linear probe, or MLP?
+Foundation models such as SAM3 \cite{carion2025sam3segmentconcepts} have demonstrated strong class-agnostic segmentation capabilities, and can be adapted to semantic segmentation via class-specific prompting. However, as also noted in prior work \cite{carion2025sam3segmentconcepts}, this approach struggles with fine-grained concepts. Since the FungiTastic dataset \cite{Picek_2025_CVPR} provides a small subset of segmented mushrooms, we confirm this limitation by prompting SAM3 with specific scientific names (e.g., Cantharellus cibarius, Boletus edulis) showing that this approach leads to incomplete segmentations and low performance. Even under oracle classification, we observe a mean IoU of only 59\% (Table~\ref{tab:results}). Moreover, this approach scales poorly, as it requires multiple forward passes per image (one for each class, when correct label is not known a priori) resulting in significant computational overhead.
 
-This broader scope also changes what the paper should look like. The README asks for two teaser plots: one for a 200-class oracle-segmentation setting and one for a 2000-class SAM-3 setting. The body then expands those top-line plots with a backbone-family ablation and a classifier ablation. The LaTeX draft should therefore reflect that structure even before every plot has been exported.
+Motivated by these limitations, we propose a two-stage framework that decouples segmentation from classification. We first extract class-agnostic segments using SAM3 \cite{carion2025sam3segmentconcepts}, and then assign semantic labels by embedding each segment through a vision foundation model (DINOv3 \cite{simeoni2025dinov3}). This design eliminates the need for class-conditioned inference, improving both efficiency and scalability, while naturally supporting low-data regimes.
 
-A related question follows naturally once multiple backbone families are on the table: is the gain coming from \emph{more models} or from \emph{more diverse models}? In practice, a diverse pair such as DINO plus SigLIP may already capture most of the benefit, while adding several more encoders could produce only marginal gains. The paper should reserve space for that fusion ablation because it changes the design recommendation from ``use a larger ensemble'' to ``use a complementary ensemble''.
+Finally, we investigate whether segment-level representations can be leveraged beyond classification, specifically as a source of data augmentation in few-shot settings.
 
-Only part of the empirical grid is completed today. The repo already contains a concrete first slice: DINOv3 ViT-7B runs with MLP heads at 224 and 448 resolution, plus a 224 $k$-NN sweep. Those runs already suggest that mask-aware pooled patches are useful when fused with the global token, while patch-only descriptors are weak. However, they do not yet answer the full README-level questions about backbone ranking, 2000-class scaling, or classifier ordering across the entire feature-family set.
+\textbf{Contributions}.
+(i) We empirically validate the limitations of prompt-based SAM3 for fine-grained segmentation, showing poor IoU even under oracle classification and unfavorable scaling with the number of classes.
+(ii) We propose a simple and scalable two-stage framework that decouples segmentation and classification via segment embeddings extracted using macro taxonomy queries.
+(iii) We benchmark multiple backbone models and evaluate segment-based augmentation strategies, providing insights into their effectiveness in low-data regimes.
 
-This draft is therefore written with two goals. It matches the final paper organization described in the README, and it preserves the completed DINOv3 evidence so the manuscript remains concrete and buildable while the remaining runs are added.
+\begin{table}[t]
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{ccccc}
+\hline
+Modality & Mean IoU & Non-empty/Total Images \\
+\hline
+% Macro-Taxonomy & train & 0.8737 & 13586 & 13777 \\
+% Macro-Taxonomy & val & 0.8680 & 8527 & 8668 \\
+Macro-Taxonomy & 0.8722 & 9643/9763 \\
+
+% Fine-Grained (Oracle) & train & 0.5815 & 8756 & 13777 \\
+% Fine-Grained (Oracle) & val & 0.6009 & 5720 & 8668 \\
+Fine-Grained (Oracle) & 0.5902 (z) & 6341/9763 \\
+
+Fine-Grained (All vs All) & $x < 0.5902$ & 6341/9763 \\
+Fine-Grained (DINO Proto) & $0.87 > (?z) > y \; (!> x)$ & 6341/9763 \\
+\hline
+\end{tabular}%
+}
+\caption{Different IoU metrics using different prompting strategies on the \textbf{split} test.}
+\label{tab:results}
+\end{table}

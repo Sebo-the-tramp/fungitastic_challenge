@@ -1,0 +1,11 @@
+\section{Related Works}
+
+\paragraph{Fine-grained few-shot learning.}
+Fine-grained recognition under limited supervision has been extensively studied in the context of classification. A list of curated resources presented in \cite{tang2024awesome_fgfs} highlight that the field remains largely focused on classification, with no exploration of dense prediction tasks. In contrast, fine-grained semantic segmentation introduces an additional requirement of precise localization, significantly increasing task complexit. Only very few recent works such as \cite{part_matching} tackled the problem. In particular, \cite{part_matching} emphasizes part-level correspondence over different view of a scene to segment part of forniture. To the best of our knowledge we find this the only work on fine-grained few-shot segmentation.
+
+\paragraph{FungiTastic benchmark and prior challenge solutions.}
+The FungiTastic dataset \cite{Picek_2025_CVPR} has primarily been explored in classification settings. Previous works that participated FungiCLEF2025 such as \cite{prototypical_networks} and \cite{contrastive} propose classification pipelines tailored to long-tailed fungal categories, focusing on feature engineering and model ensembling. These solution, also assume the possibility to finetune a small network to solve the task. 
+
+\paragraph{Prototype and embedding-based methods.}
+Prototype-based learning has emerged as a strong paradigm for few-shot recognition, where class representations are formed in embedding space. Although based on multimodal prototypes, recent works such as \cite{multimodal} adopts prototype-based learning to address class imbalance and improve generalization. These approaches are conceptually aligned with our second-stage design, where segment-level embeddings are used for classification. However, prior methods assume pre-segmented inputs or operate on global image features, whereas our framework integrates class-agnostic segmentation with embedding-based classification in a unified pipeline.
+

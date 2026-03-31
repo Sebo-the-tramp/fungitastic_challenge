@@ -1,0 +1,170 @@
+%% Editing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\newcommand{\MIGHTCHANGE}[1]{{\textcolor{magenta}{#1}}}
+% \newcommand{\TODO}[1]{{\textbf{\textcolor{todo}{TODO: #1}}}}
+% \newcommand{\todo}[1]{\textbf{\textcolor{todo}{#1}}}
+
+%colors
+\newcommand{\bgcolor}[2]{\setlength{\fboxsep}{0pt}\colorbox{#1}{\strut #2}}
+\newcommand{\BGcolor}[3][HTML]{\definecolor{mycolor}{HTML}{#2}\bgcolor{mycolor}{#3}}
+
+\newcommand{\method}[1]{{NewtPhys}}
+
+%% edits
+\newcommand{\FP}[1]{\textcolor{author2}{#1}}
+\newcommand{\SC}[1]{\textcolor{author4}{#1}}
+\newcommand{\LF}[1]{\textcolor{author1}{#1}}
+
+%% comments
+\newcommand{\FPc}[1]{\textcolor{author2}{[\textbf{FP}: #1]}}
+\newcommand{\SCc}[1]{\textcolor{author4}{[\textbf{SC}: #1]}}
+\newcommand{\LFc}[1]{\textcolor{author1}{[\textbf{LF}: #1]}}
+
+
+%\renewcommand{\RC}[1]{#1}
+%\renewcommand{\SC}[1]{#1}
+%\renewcommand{\THV}[1]{#1}
+%\renewcommand{\andrei}[1]{#1}
+%
+%\renewcommand{\RCc}[1]{}
+%\renewcommand{\SCc}[1]{}
+%\renewcommand{\THVc}[1]{}
+%\renewcommand{\andreic}[1]{}
+%
+%\renewcommand{\todo}[1]{}
+
+%% Colors %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\definecolor{darkmagenta}{RGB}{186, 0, 186}
+\definecolor{slateblue}{RGB}{90, 70, 230}
+
+\definecolor{todo}{HTML}{E15554}
+\definecolor{author1}{HTML}{40A050}
+\definecolor{author2}{HTML}{C33C54}
+\definecolor{author3}{HTML}{E6AA68}
+\definecolor{author4}{HTML}{0F4893}
+
+\definecolor{material}{HTML}{2BAE27}
+\definecolor{mechanics}{HTML}{FF5733}
+\definecolor{spatial}{HTML}{3498DB}
+\definecolor{permanence}{HTML}{F43FC7}
+\definecolor{temporal}{HTML}{0DA792}
+\definecolor{viewpoint}{HTML}{EEAC32}
+
+%% Custom macro %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\newcommand{\materialCol}[1]{\textcolor{material}{#1}}
+\newcommand{\mechanicsCol}[1]{\textcolor{mechanics}{#1}}
+\newcommand{\spatialCol}[1]{\textcolor{spatial}{#1}}
+\newcommand{\permanenceCol}[1]{\textcolor{permanence}{#1}}
+\newcommand{\temporalCol}[1]{\textcolor{temporal}{#1}}
+\newcommand{\viewpointCol}[1]{\textcolor{viewpoint}{#1}}
+
+\newcommand{\material}{\materialCol{material understanding}}
+\newcommand{\Material}{\materialCol{Material understanding}}
+\newcommand{\mechanics}{\mechanicsCol{mechanics}}
+\newcommand{\Mechanics}{\mechanicsCol{Mechanics}}
+\newcommand{\spatial}{\spatialCol{spatial reasoning}}
+\newcommand{\Spatial}{\spatialCol{Spatial reasoning}}
+\newcommand{\permanence}{\permanenceCol{permanence}}
+\newcommand{\Permanence}{\permanenceCol{Permanence}}
+\newcommand{\temporal}{\temporalCol{temporal reasoning}}
+\newcommand{\Temporal}{\temporalCol{Temporal reasoning}}
+\newcommand{\viewpoint}{\viewpointCol{viewpoint}}
+\newcommand{\Viewpoint}{\viewpointCol{Viewpoint}}
+
+
+%% Method %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\newcommand{\Enc}{\mathcal{E}}       % Encoder function
+\newcommand{\Dec}{\mathcal{D}}       % Decoder function
+
+%% dataset
+% \newcommand{\vkitti}{Virtual KITTI 2}
+% \newcommand{\vkitti}{VKITTI 2}
+% \newcommand{\kittiflow}{KITTI Flow}
+% \newcommand{\kitti}{KITTI}
+% \newcommand{\diode}{DIODE}
+% \newcommand{\hypersim}{Hypersim}
+% \newcommand{\flying}{FlyingThings3D}
+% \newcommand{\cs}[0]{Cityscapes}
+
+
+% Abbrv versions
+% \newcommand{\SSemantic}{\textbf{\textcolor{semantic}{Seg.}}}
+% \newcommand{\NNormal}{\textbf{\textcolor{normal}{Normal}}}
+% \newcommand{\DDepth}{\textbf{\textcolor{depth}{Depth}}}
+% \newcommand{\OOpticalflow}{\textbf{\textcolor{opticalflow}{Opt.Flow}}}
+% \newcommand{\SSceneflow}{\textbf{\textcolor{sceneflow}{Sc.Flow}}}
+% \newcommand{\SShading}{\textbf{\textcolor{shading}{Sha.}}}
+% \newcommand{\AAlbedo}{\textbf{\textcolor{albedo}{Alb.}}}
+
+%% Abbreviations %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\newcommand{\condenseparagraph}[1]{{\vspace*{0.1em}\noindent\textbf{#1}\quad}}
+
+% Add a period to the end of an abbreviation unless there's one already, then \xspace.
+\makeatletter
+\DeclareRobustCommand\onedot{\futurelet\@let@token\@onedot}
+\def\@onedot{\ifx\@let@token.\else.\null\fi\xspace}
+
+\def\eg{\emph{e.g}\onedot} \def\Eg{\emph{E.g}\onedot}
+\def\ie{\emph{i.e}\onedot} \def\Ie{\emph{I.e}\onedot}
+\def\cf{\emph{cf}\onedot} \def\Cf{\emph{Cf}\onedot}
+\def\etc{\emph{etc}\onedot} \def\vs{\emph{vs}\onedot}
+\def\wrt{w.r.t\onedot} \def\dof{d.o.f\onedot}
+
+%% Tables/Figures %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\stl}[1]{{\textcolor{gray}{#1}}}
+
+
+\newcommand{\imgsize}{.125\textwidth}
+ 
+%% centered resized column
+%\newcolumntype{C}[1]{>{\centering\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+%% add spacer between two columns
+%\newcolumntype{S}[1]{@{\hspace{#1}}}
+%% hide whole column
+%\newcolumntype{H}{>{\setbox0=\hbox\bgroup}c<{\egroup}@{}}
+%% vertical cell content
+\newcommand{\STAB}[1]{\begin{tabular}{@{}c@{}}#1\end{tabular}}
+\newcommand{\verti}[2]{\multirow{1}{*}[#1]{\rotatebox[origin=c]{90}{#2}}}
+
+\newcommand{\best}[1]{\textbf{#1}}
+\newcommand{\second}[1]{\underline{#1}}
+
+\definecolor{best}{HTML}{C6EFCE}    % light green
+\definecolor{second}{HTML}{FFF2CC}  % light yellow
+\newcommand{\dataset}[1]{{\scriptsize\textcolor{gray}{#1}}}
+
+
+%% Annotations %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\deltam}{\Delta_{\rm m}}
+
+
+
+
+%% heatmap table
+% --- In your preamble ---
+% \usepackage[table]{xcolor}
+% \usepackage{colortbl}
+
+% 10-step pastel gradient: light red → soft orange → yellow → mint → dark green
+\definecolor{pgrade1}{RGB}{255,204,204}  % very light red (worst)
+\definecolor{pgrade2}{RGB}{255,221,204}  % light salmon
+\definecolor{pgrade3}{RGB}{255,238,204}  % light orange
+\definecolor{pgrade4}{RGB}{255,255,204}  % pale yellow
+\definecolor{pgrade5}{RGB}{229,255,204}  % yellow-green
+\definecolor{pgrade6}{RGB}{204,255,204}  % light mint
+\definecolor{pgrade7}{RGB}{178,242,187}  % mint green
+\definecolor{pgrade8}{RGB}{153,230,170}  % soft green
+\definecolor{pgrade9}{RGB}{102,204,136}  % medium green
+\definecolor{pgrade10}{RGB}{51,153,102}  % dark green (best)
+
+% Pastel green → white gradient (strong correlation = green)
+\definecolor{corr0}{RGB}{255,255,255}  % white (no correlation)
+\definecolor{corr1}{RGB}{229,245,233}
+\definecolor{corr2}{RGB}{204,232,207}
+\definecolor{corr3}{RGB}{168,221,181}
+\definecolor{corr4}{RGB}{123,204,196}
+\definecolor{corr5}{RGB}{78,179,211}
+\definecolor{corr6}{RGB}{43,140,190}
+\definecolor{corr7}{RGB}{29,116,155}
+\definecolor{corr8}{RGB}{20,90,120}
+\definecolor{corr9}{RGB}{0,68,89}      % dark teal-green (strongest)
