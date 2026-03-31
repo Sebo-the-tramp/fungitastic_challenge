@@ -4,6 +4,7 @@ from pathlib import Path
 from rich.table import Table
 from rich.console import Console
 import torch
+import torch.nn.functional as F
 import os
 import csv
 import random
@@ -133,9 +134,9 @@ def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name="", mas
     test_class_indices = build_class_indices(test_labels, num_classes)
     test_file_names_all, total_pixels_all, pixel_in_all, pixel_out_all = build_mask_cache(test_data["file_paths"], masks)
 
-    train_features_all = train_data["cls_tokens"].to(DEVICE)
+    train_features_all = F.normalize(train_data["cls_tokens"].to(DEVICE), p=2, dim=1)
     train_labels_all = train_labels.to(DEVICE)
-    test_features_all = test_data["cls_tokens"].to(DEVICE)
+    test_features_all = F.normalize(test_data["cls_tokens"].to(DEVICE), p=2, dim=1)
     test_feature_norms_all = test_features_all.square().sum(dim=1)
 
     for seed in tqdm(seeds, desc="Seeds", position=0):
@@ -233,7 +234,7 @@ if __name__ == "__main__":
     # num_seeds = [7, 42, 123, 2024, 9999]
     np.random.seed(42)
     num_seeds = list(map(int, np.random.randint(0, 10000, size=20)))
-    experiment_name = "prototype"
+    experiment_name = "prototype_normalized"
 
     masks = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed/sam3_yolo_generic_mushroom_200/all/test/720/FungiTastic/test/720p"))
     results = run_sweep(1, max_samples, seeds=num_seeds, experiment_name=experiment_name, masks=masks, save_csv=True)

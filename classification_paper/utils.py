@@ -6,7 +6,7 @@ import cv2
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 from PIL import Image
 from torch.utils.data import DataLoader
 
@@ -25,19 +25,19 @@ PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2")
 DATASET_ROOT = Path("/data0/sebastian.cavada/datasets/FungiTastic")
 
 DATA_SUBSET = os.environ.get("DATA_SUBSET", "all")
-SPLIT = os.environ.get("SPLIT", "train")
+SPLIT = os.environ.get("SPLIT", "test")
 DATASET_SIZE = os.environ.get("DATASET_SIZE", "720")
 TASK = os.environ.get("TASK", "closed")
-PROMPT_MODE = os.environ.get("PROMPT_MODE", "species")
-GENERIC_PROMPT = os.environ.get("GENERIC_PROMPT", "mushroom")
-BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "8"))
-NUM_WORKERS = int(os.environ.get("NUM_WORKERS", "8"))
+BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "16"))
+NUM_WORKERS = int(os.environ.get("NUM_WORKERS", "2"))
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MODEL_DTYPE = torch.bfloat16 if DEVICE == "cuda" else torch.float32
 PIN_MEMORY = DEVICE == "cuda"
+POLYGON_CLOSE_KERNEL_SIZE = 3
 
 sys.path.append(str(PROJECT_ROOT / "FungiTastic"))
-from dataset.fungi import FungiTastic
+from dataset.mask_fungi import MaskFungiTastic
+from dataset.utils.mask_vis import get_image_shape, resize_mask_to_image
 
 def seed_everything(seed: int) -> None:
     random.seed(seed)
@@ -56,11 +56,13 @@ def load_shards(data_path: Path) -> dict[str, torch.Tensor | None]:
     mean_pooled_gt_masked_patch_tokens = []
     mean_pooled_sam_masked_patch_tokens = []
     patch_features = []
+    file_paths = []
     has_register_tokens = None
 
     for shard_path in tqdm(sorted(data_path.glob("*.pt")), desc=f"Loading {data_path.name}", unit="shard"):
         shard_data = torch.load(shard_path, map_location="cpu")
         labels.extend(shard_data["labels"])
+        file_paths.extend(shard_data["file_paths"])
         cls_tokens.append(shard_data["cls_token"].float())
         shard_register_tokens = shard_data["register_tokens"]
         if has_register_tokens is None:
@@ -76,6 +78,7 @@ def load_shards(data_path: Path) -> dict[str, torch.Tensor | None]:
 
     return {
         "labels": torch.tensor(labels),
+        "file_paths": file_paths,
         "cls_tokens": torch.cat(cls_tokens),
         "register_tokens": torch.cat(register_tokens).to("cpu") if register_tokens else None,
         "mean_pooled_patch_tokens": torch.cat(mean_pooled_patch_tokens).to("cpu"),
@@ -88,13 +91,12 @@ def collate_batch(
     batch: list[tuple[Image.Image, np.ndarray, int | None, str, list[str]]]
 ) -> tuple[list[Image.Image], list[np.ndarray], list[int | None], list[str]]:
     images = [item[0] for item in batch]
-    # masks = [item[1] for item in batch] # this is not present
-    labels = [item[1] for item in batch]
-    file_paths = [item[2] for item in batch]
-    return images, [], labels, file_paths
+    masks = [item[1] for item in batch] # this is not present
+    labels = [item[2] for item in batch]
+    file_paths = [item[3] for item in batch]
+    return images, masks, labels, file_paths
 
-def read_segments(file_path):
-    segment_path = os.path.join(file_path)
+def read_segments(segment_path):
     segments = []
     class_ids = []
 
@@ -112,38 +114,69 @@ def read_segments(file_path):
         
         return segments, class_ids
     else:
-        print(f"Segment not found for {file_path}")
-        return None
+        print(f"Segment not found for {segment_path}")
+        return None, None
     
 
 
-def polygon_to_mask(polygons, img_width, img_height):
-    """
-    Converts a list of polygons into a single binary mask.
-    segments: List of polygons, where each polygon is a list of (x, y) tuples.
-    """
-    # 1. Initialize an empty black mask
+def polygon_to_mask(
+    polygons: Sequence[Sequence[tuple[float, float]]],
+    img_width: int,
+    img_height: int,
+) -> np.ndarray:
     mask = np.zeros((img_height, img_width), dtype=np.uint8)
-    
-    # 2. Prepare the list of scaled polygons for OpenCV
-    all_polygons_scaled = []
-    
+
+    contours = []
     for polygon in polygons:
-        # Scale the normalized (0-1) coordinates to actual pixel values
-        pixel_coords = np.array([[x * img_width, y * img_height] for x, y in polygon], dtype=np.int32)
-        all_polygons_scaled.append(pixel_coords)
-    
-    # 3. Fill all polygons with white (255)
-    # cv2.fillPoly can take a list of arrays directly
-    if all_polygons_scaled:
-        cv2.fillPoly(mask, all_polygons_scaled, 255)
-    
+        coords = np.asarray(polygon, dtype=np.float32).reshape(-1, 2)
+        coords[:, 0] = np.clip(np.rint(coords[:, 0] * (img_width - 1)), 0, img_width - 1)
+        coords[:, 1] = np.clip(np.rint(coords[:, 1] * (img_height - 1)), 0, img_height - 1)
+        coords = coords.astype(np.int32)
+        keep = np.ones(len(coords), dtype=bool)
+        keep[1:] = np.any(coords[1:] != coords[:-1], axis=1)
+        coords = coords[keep]
+        if len(coords) > 1 and np.array_equal(coords[0], coords[-1]):
+            coords = coords[:-1]
+        if len(coords) < 3:
+            continue
+        contour = coords.reshape(-1, 1, 2)
+        if cv2.contourArea(contour) == 0:
+            contour = cv2.convexHull(contour)
+        if len(contour) >= 3:
+            contours.append(contour)
+
+    if contours:
+        cv2.fillPoly(mask, contours, 255)
+        kernel = cv2.getStructuringElement(
+            cv2.MORPH_ELLIPSE,
+            (POLYGON_CLOSE_KERNEL_SIZE, POLYGON_CLOSE_KERNEL_SIZE),
+        )
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        padded = np.pad(mask, 1, constant_values=0)
+        flooded = padded.copy()
+        flood_mask = np.zeros((img_height + 4, img_width + 4), dtype=np.uint8)
+        cv2.floodFill(flooded, flood_mask, (0, 0), 255)
+        mask = cv2.bitwise_or(mask, cv2.bitwise_not(flooded)[1:-1, 1:-1])
+
     return mask
 
 
-def load_masks(mask_path: Path) -> torch.Tensor:
+def load_masks(mask_base_path: Path) -> torch.Tensor:
 
-    dataset = FungiTastic(
+    if "specific" in str(mask_base_path):
+        print("Loading specific SAM masks...")
+        cache_path = "/home/cavadalab/Documents/scsv/fungitastic2026_2/classification_paper/cache/sam_masks_specific.pt"
+    elif "generic" in str(mask_base_path):
+        print("Loading generic SAM masks...")
+        cache_path = "/home/cavadalab/Documents/scsv/fungitastic2026_2/classification_paper/cache/sam_masks_general.pt"
+    else:
+        assert False, f"Unknown mask type in path: {mask_base_path}"
+
+    if os.path.exists(cache_path):
+        print(f"Loading cached SAM masks from {cache_path}")
+        return torch.load(cache_path)
+
+    dataset = MaskFungiTastic(
         root=str(DATASET_ROOT),
         data_subset=DATA_SUBSET,
         split=SPLIT,
@@ -166,23 +199,44 @@ def load_masks(mask_path: Path) -> torch.Tensor:
     dataloader = DataLoader(dataset, **dataloader_kwargs)
     masks = {}
 
-    progress = tqdm(dataloader, desc="sam3", unit="batch")    
+    progress = tqdm(dataloader, desc="sam3", unit="batch")
 
-    for images, gt_masks, _, file_paths in progress:        
-        for gt_mask, file_path in zip(gt_masks, file_paths):
+    not_found_count = 0
+
+    for images, gt_masks, _, file_paths in progress:
+        for image, gt_mask, file_path in zip(images, gt_masks, file_paths):
             file_name = file_path.split("/")[-1].replace(".JPG", ".txt")
-            mask_path = mask_path / file_name
-            segments, class_ids = read_segments(mask_path)
+            mask_path = mask_base_path / file_name
+            segments, _ = read_segments(mask_path)
             if segments is not None:
+                mask_sam = polygon_to_mask(segments, image.size[0], image.size[1])
+                print(f"Image shape for {file_name}: {image.size}")
+                sam_mask_tensor = torch.from_numpy(mask_sam).unsqueeze(0)
+                gt_mask_tensor = torch.from_numpy(resize_mask_to_image(gt_mask, (image.size[1], image.size[0]))).unsqueeze(0)
 
-                mask_sam = polygon_to_mask(segments, images[0].size[0], images[0].size[1])
-                mask_sam_tensor = torch.from_numpy(mask_sam).unsqueeze(0)
-                masks[file_name] = mask_sam_tensor
+                assert sam_mask_tensor.shape == gt_mask_tensor.shape, f"Shape mismatch for {file_name}: SAM mask shape {sam_mask_tensor.shape}, GT mask shape {gt_mask_tensor.shape}"
+
+                masks[file_name] = {
+                    "sam_mask": sam_mask_tensor,
+                    "gt_mask": gt_mask_tensor,
+                }
+
+            else:
+                not_found_count += 1
+                print(f"Mask not found for {file_name}. Total not found so far: {not_found_count}")
+
+    # Cache the SAM masks for future runs
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+    torch.save(masks, cache_path)
 
     return masks
 
 
 def balance_data(data: dict[str, torch.Tensor | None], seed: int, samples_per_class: int) -> dict[str, torch.Tensor | None]:
+
+    # set random seed for reproducibility
+    random.seed(seed)
+
     labels = data["labels"]
     unique_labels = torch.unique(labels)
     balanced_indices = []
@@ -196,7 +250,19 @@ def balance_data(data: dict[str, torch.Tensor | None], seed: int, samples_per_cl
         balanced_indices.append(sampled_indices)
 
     balanced_indices = torch.cat(balanced_indices)
-    balanced_data = {key: (value[balanced_indices] if value is not None else None) for key, value in data.items()}
+    # balanced_data = {key: (value[balanced_indices] if value is not None else None) for key, value in data.items()} # -> before
+
+    balanced_data = {
+        key: (
+            # Check if it's a list (like your paths)
+            [value[i] for i in balanced_indices.tolist()] if isinstance(value, list) 
+            # Otherwise, assume it's a tensor/array that supports direct indexing
+            else value[balanced_indices] if value is not None 
+            else None
+        ) 
+        for key, value in data.items()
+    }
+
     return balanced_data
 
 
@@ -360,3 +426,113 @@ def save_run(
     run_path.write_text(json.dumps(payload, indent=2) + "\n")
     refresh_dashboard_results()
     return run_path
+
+
+
+def compute_metrics_final(data_raw, num_classes=None):
+
+    """
+    Computes Image-level and Pixel-level metrics from data_raw.
+    """
+    # --- 1. Image-Level Metrics ---
+    # Overall Accuracy: (Total Correct Images) / (Total Images)
+    correct_images = sum(1 for d in data_raw if d['pred_class'] == d['gt_class'])
+    overall_img_acc = correct_images / len(data_raw)
+
+    # Macro Accuracy (Image-level): Mean of per-class image accuracies
+    img_accs_per_class = []
+    for cid in range(num_classes):
+        class_samples = [d for d in data_raw if d['gt_class'] == cid]
+        if len(class_samples) > 0:
+            correct = sum(1 for d in class_samples if d['pred_class'] == cid)
+            img_accs_per_class.append(correct / len(class_samples))
+    
+    macro_img_acc = np.mean(img_accs_per_class)
+
+    # --- 2. Pixel-Level Metrics (IoU & Macro Accuracy) ---
+    pixel_iou_per_class = []
+    pixel_acc_per_class = []
+
+    for cid in range(num_classes):
+        # Samples where this class IS the Ground Truth
+        gt_class_data = [d for d in data_raw if d['gt_class'] == cid]
+        # Samples where we PREDICTED this class (but it might be wrong)
+        pred_class_data = [d for d in data_raw if d['pred_class'] == cid]
+
+        if len(gt_class_data) == 0 and len(pred_class_data) == 0:
+            continue
+
+        # Intersection: Pixels in SAM mask ONLY if we predicted the right class label
+        # (This assumes the whole mask is assigned the predicted class)
+        intersection = sum(d['pixel_in'] for d in gt_class_data if d['pred_class'] == cid)
+
+        # Union: (Total GT area) + (Total area we claimed was this class) - Intersection
+        total_gt_area = sum(d['total_pixels'] for d in gt_class_data)
+        
+        # Predicted area is the SAM mask size for every image we labeled as 'cid'
+        # Note: we need the SAM mask size. Since pixel_in + pixel_out = total_pixels 
+        # in your current loop only for the GT class, we'll use a slightly different logic:
+        total_pred_area = sum((d['pixel_in'] + d['pixel_out']) for d in pred_class_data)
+
+        union = total_gt_area + total_pred_area - intersection
+        
+        # Per-class Pixel Accuracy (Macro)
+        if total_gt_area > 0:
+            pixel_acc_per_class.append(intersection / total_gt_area)
+            
+        # Per-class IoU
+        if union > 0:
+            pixel_iou_per_class.append(intersection / (union + 1e-10))
+
+    return {
+        'overall_img_acc': overall_img_acc,
+        'macro_img_acc': macro_img_acc,
+        'macro_pixel_acc': np.mean(pixel_acc_per_class),
+        'mIoU': np.mean(pixel_iou_per_class)
+    }
+
+
+def compute_metrics_final_fast(data_raw, num_classes=None):
+
+    """
+    Computes Image-level and Pixel-level metrics from data_raw.
+    """
+    if isinstance(data_raw, dict):
+        gt_class = torch.as_tensor(data_raw["gt_class"], dtype=torch.long)
+        pred_class = torch.as_tensor(data_raw["pred_class"], dtype=torch.long)
+        total_pixels = torch.as_tensor(data_raw["total_pixels"], dtype=torch.float64)
+        pixel_in = torch.as_tensor(data_raw["pixel_in"], dtype=torch.float64)
+        pixel_out = torch.as_tensor(data_raw["pixel_out"], dtype=torch.float64)
+    else:
+        gt_class = torch.tensor([d["gt_class"] for d in data_raw], dtype=torch.long)
+        pred_class = torch.tensor([d["pred_class"] for d in data_raw], dtype=torch.long)
+        total_pixels = torch.tensor([d["total_pixels"] for d in data_raw], dtype=torch.float64)
+        pixel_in = torch.tensor([d["pixel_in"] for d in data_raw], dtype=torch.float64)
+        pixel_out = torch.tensor([d["pixel_out"] for d in data_raw], dtype=torch.float64)
+
+    if num_classes is None:
+        num_classes = int(torch.cat([gt_class, pred_class]).max().item()) + 1
+
+    correct_mask = pred_class == gt_class
+    overall_img_acc = correct_mask.to(torch.float64).mean().item()
+
+    gt_count = torch.bincount(gt_class, minlength=num_classes)
+    correct_count = torch.bincount(gt_class[correct_mask], minlength=num_classes)
+    valid_gt = gt_count > 0
+    macro_img_acc = (correct_count[valid_gt].to(torch.float64) / gt_count[valid_gt]).mean().item()
+
+    intersection = torch.bincount(gt_class[correct_mask], weights=pixel_in[correct_mask], minlength=num_classes)
+    total_gt_area = torch.bincount(gt_class, weights=total_pixels, minlength=num_classes)
+    total_pred_area = torch.bincount(pred_class, weights=pixel_in + pixel_out, minlength=num_classes)
+    union = total_gt_area + total_pred_area - intersection
+
+    macro_pixel_acc = (intersection[valid_gt] / total_gt_area[valid_gt]).mean().item()
+    valid_union = union > 0
+    miou = (intersection[valid_union] / (union[valid_union] + 1e-10)).mean().item()
+
+    return {
+        "overall_img_acc": overall_img_acc,
+        "macro_img_acc": macro_img_acc,
+        "macro_pixel_acc": macro_pixel_acc,
+        "mIoU": miou,
+    }

@@ -2,6 +2,8 @@
 **.json
 **.png
 **.csv
+**.pth
+**.pt
 
 __pycache__/
 data_processed/**

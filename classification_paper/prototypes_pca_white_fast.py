@@ -118,7 +118,54 @@ def prototype_method(
     }
 
 
-def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name="", masks={}, save_csv=True):
+def pca_whiten_features(
+    train_features: torch.Tensor,
+    test_features: torch.Tensor,
+    pca_dim: int
+) -> tuple[torch.Tensor, torch.Tensor]:
+    train_features = train_features.float()
+    test_features = test_features.float()
+    pca_dim = min(pca_dim, train_features.shape[0] - 1, train_features.shape[1])
+    assert pca_dim > 0
+    train_mean = train_features.mean(dim=0, keepdim=True)
+    train_centered = train_features - train_mean
+    test_centered = test_features - train_mean
+    _, singular_values, basis = torch.pca_lowrank(train_centered, q=pca_dim, center=False)
+    scale = singular_values[:pca_dim] / (train_features.shape[0] - 1) ** 0.5
+    train_features = train_centered @ basis[:, :pca_dim] / scale
+    test_features = test_centered @ basis[:, :pca_dim] / scale
+    return train_features, test_features
+
+
+@torch.no_grad()
+def prototype_method_pca(
+    train_features: torch.Tensor,
+    train_labels: torch.Tensor,
+    test_features: torch.Tensor,
+    test_labels: torch.Tensor,
+    test_file_names: list[str],
+    total_pixels: torch.Tensor,
+    pixel_in: torch.Tensor,
+    pixel_out: torch.Tensor,
+    num_classes: int,
+    pca_dim: int
+) -> tuple[list[dict[str, int | str]], dict[str, torch.Tensor]]:
+    train_features, test_features = pca_whiten_features(train_features, test_features, pca_dim=pca_dim)
+    return prototype_method(
+        train_features=train_features,
+        train_labels=train_labels,
+        test_features=test_features,
+        test_feature_norms=test_features.square().sum(dim=1),
+        test_labels=test_labels,
+        test_file_names=test_file_names,
+        total_pixels=total_pixels,
+        pixel_in=pixel_in,
+        pixel_out=pixel_out,
+        num_classes=num_classes,
+    )
+
+
+def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name="", masks={}, pca_dim=128, save_csv=True):
     all_results = []
 
     train_data = load_shards(ROOT / MODEL_TRAIN)
@@ -136,7 +183,6 @@ def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name="", mas
     train_features_all = train_data["cls_tokens"].to(DEVICE)
     train_labels_all = train_labels.to(DEVICE)
     test_features_all = test_data["cls_tokens"].to(DEVICE)
-    test_feature_norms_all = test_features_all.square().sum(dim=1)
 
     for seed in tqdm(seeds, desc="Seeds", position=0):
         seed_everything(seed)
@@ -164,17 +210,17 @@ def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name="", mas
             train_indices_device = train_indices.to(DEVICE)
             test_indices_device = test_indices.to(DEVICE)
 
-            raw_data, metrics_data = prototype_method(
+            raw_data, metrics_data = prototype_method_pca(
                 train_features=train_features_all[train_indices_device],
                 train_labels=train_labels_all[train_indices_device],
                 test_features=test_features_all[test_indices_device],
-                test_feature_norms=test_feature_norms_all[test_indices_device],
                 test_labels=test_labels[test_indices],
                 test_file_names=[test_file_names_all[i] for i in test_indices.tolist()],
                 total_pixels=total_pixels_all[test_indices],
                 pixel_in=pixel_in_all[test_indices],
                 pixel_out=pixel_out_all[test_indices],
                 num_classes=num_classes,
+                pca_dim=pca_dim
             )
             metrics = compute_metrics_final_fast(metrics_data, num_classes=num_classes)
 
@@ -208,6 +254,7 @@ def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name="", mas
         # plot_sweep(seed_results, save_path=f"{csv_path_prefix}_plot_accuracy.png", metric="accuracy_euclidean", save_only=True)
         # plot_sweep(seed_results, save_path=f"{csv_path_prefix}_plot_miou.png", metric="mIoU", save_only=True)
 
+
     return all_results
 
 
@@ -230,10 +277,12 @@ def plot_sweep(results, save_path="sweep_samples_per_class_plot.png", metric="ac
 if __name__ == "__main__":
 
     max_samples = 200
+    pca_dim=1024
     # num_seeds = [7, 42, 123, 2024, 9999]
     np.random.seed(42)
     num_seeds = list(map(int, np.random.randint(0, 10000, size=20)))
-    experiment_name = "prototype"
+    print(num_seeds)
+    experiment_name = f"prototype_pca_white_{pca_dim}"
 
     masks = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed/sam3_yolo_generic_mushroom_200/all/test/720/FungiTastic/test/720p"))
-    results = run_sweep(1, max_samples, seeds=num_seeds, experiment_name=experiment_name, masks=masks, save_csv=True)
+    results = run_sweep(1, max_samples, seeds=num_seeds, experiment_name=experiment_name, masks=masks, pca_dim=pca_dim, save_csv=True)

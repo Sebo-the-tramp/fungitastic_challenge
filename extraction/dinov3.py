@@ -57,7 +57,7 @@ BACKGROUND_TYPES = [
     "masked_blurred",
     "normal",
 ]
-BACKGROUND = os.environ.get("BACKGROUND", "crop")
+BACKGROUND = os.environ.get("BACKGROUND", "normal")
 MIN_BOX_AREA = 2500
 
 USE_SAM_MASKS = True

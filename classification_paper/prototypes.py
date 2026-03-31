@@ -6,9 +6,9 @@ from rich.console import Console
 import torch
 import os
 import csv
+from tqdm import tqdm
 
-from sklearn.metrics import precision_recall_fscore_support
-from utils import load_shards, seed_everything, balance_data, remap_labels, load_masks
+from utils import load_shards, seed_everything, balance_data, remap_labels, load_masks, compute_metrics_final
 
 SEED = 7
 
@@ -22,7 +22,7 @@ CLASSIFICATION_RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
 
 def prototype_method(train_data: dict[str, torch.Tensor | None], 
-     test_data: dict[str, torch.Tensor | None]) -> None:
+    test_data: dict[str, torch.Tensor | None], masks) -> None:
 
     train_labels = train_data['labels']
     test_labels = test_data['labels']
@@ -30,54 +30,81 @@ def prototype_method(train_data: dict[str, torch.Tensor | None],
     train_features = train_data['cls_tokens']
     test_features = test_data['cls_tokens']
 
+    test_image_file_names = [file_path.split("/")[-1] for file_path in test_data['file_paths']]
+
+    gt_masks_test = [masks.get(file_name.replace(".JPG", ".txt"))['gt_mask'] for file_name in test_image_file_names]
+    sam_masks_test = [masks.get(file_name.replace(".JPG", ".txt"))['sam_mask'] for file_name in test_image_file_names]
+
     num_classes = train_labels.max().item() + 1
     feature_dim = train_features.size(1)
 
-    # Compute mean and std for prototype methods
-    mean = torch.zeros(num_classes, feature_dim, dtype=train_features.dtype, device=train_features.device)
-    std = torch.zeros(num_classes, feature_dim, dtype=train_features.dtype, device=train_features.device)
+    prototypes = torch.zeros(num_classes, feature_dim, dtype=train_features.dtype, device=train_features.device)
     for class_id in range(num_classes):
         class_features = train_features[train_labels == class_id]
         if len(class_features) > 0:
-            mean[class_id] = class_features.mean(dim=0)
-            std[class_id] = class_features.std(dim=0)
-    
-    accuracies_per_class = {}
+            prototypes[class_id] = class_features.mean(dim=0)
 
-    for class_id in range(num_classes):
-        if(test_labels == class_id).sum().item() == 0:
-            # print(f"Class {class_id}: No samples in test set, skipping.")
-            continue
-        class_features = test_features[test_labels == class_id]
-        dist_euc = torch.cdist(class_features, mean, p=2)
-        min_dist_euc = dist_euc.argmin(dim=1)
-        acc_euc = (min_dist_euc == class_id).float().mean().item()
-        # print(f"Class {class_id}: Euclidean Accuracy = {acc_euc:.4f}")
+    data_raw = []
+    for i in range(len(test_labels)):
 
-        accuracies_per_class[class_id] = {
-            'euclidean': acc_euc
-        }
+        total_pixels = gt_masks_test[i].sum().item()
+        pixel_in = (gt_masks_test[i] & sam_masks_test[i]).sum().item()
+        pixel_out = total_pixels - pixel_in
+        gt_class = test_labels[i].item()
+        pred_class = torch.cdist(test_features[i:i+1], prototypes, p=2).argmin(dim=1).item()
 
-    overall_acc_euc = (torch.cdist(test_features, mean, p=2).argmin(dim=1) == test_labels).float().mean().item()
-    mAcc_euc = np.mean([v['euclidean'] for v in accuracies_per_class.values()])
+        data_raw.append({
+            'index': i,
+            'file_name': test_image_file_names[i].split('.')[0],
+            'total_pixels': total_pixels,
+            'pixel_in': pixel_in,
+            'pixel_out': pixel_out,
+            'gt_class': gt_class,
+            'pred_class': pred_class
+        })
 
-    return overall_acc_euc, mAcc_euc
+    # overall_acc_euc = (torch.cdist(test_features, prototypes, p=2).argmin(dim=1) == test_labels).float().mean().item()
+    # class_accuracies = [
+    #     (torch.cdist(test_features[test_labels == class_id], prototypes, p=2).argmin(dim=1) == class_id).float().mean().item() 
+    #     for class_id in range(num_classes)
+    #     if (test_labels == class_id).any()  # This is the "Gatekeeper"
+    # ]
+    # mAcc_euc = np.mean(class_accuracies) if class_accuracies else 0.0
+
+    # print(f"Overall Accuracy (Euclidean): {overall_acc_euc:.4f}")
+    # print(f"Mean Accuracy (Euclidean): {mAcc_euc:.4f}")
+
+    # print(f"+++++++++++++++++++++++++++++")
+
+    # metrics = compute_metrics_final(data_raw, num_classes=num_classes)
+
+    # for metric_name, metric_value in metrics.items():
+    #     print(f"{metric_name}: {metric_value:.4f}")
+
+    return data_raw
 
 
-def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name = "", save_csv=True):
-    results = []
+def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name = "", masks={}, save_csv=True):
 
     # Prepare data with current samples_per_class
     train_data = load_shards(ROOT / MODEL_TRAIN)
     test_data = load_shards(ROOT / MODEL_TEST)
 
-
-    for seed in seeds:
+    for seed in tqdm(seeds, desc="Seeds", position=0):
         seed_everything(seed)
-        csv_path = f'./results/{experiment_name}/{seed}.csv'
 
-        for samples_per_class in range(min_samples, max_samples + 1):
-            
+        results_raw = []
+        results_computed = []
+
+        csv_path_prefix = f'./results/{experiment_name}/{seed}'
+
+        for samples_per_class in tqdm(
+            range(min_samples, max_samples + 1),
+            desc=f"Samples seed={seed}",
+            position=1,
+            leave=False,
+        ):
+
             train_data_balanced = balance_data(train_data, seed=seed, samples_per_class=samples_per_class)
             test_data_balanced = balance_data(test_data, seed=seed, samples_per_class=samples_per_class)
 
@@ -86,25 +113,59 @@ def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name = "", s
             test_data_balanced['labels'] = test_labels
 
             # Run prototype method
-            global_acc_euc, mAcc  = prototype_method(train_data_balanced, test_data_balanced)
-
-            result = {
+            raw_data = prototype_method(train_data_balanced, test_data_balanced, masks=masks)
+            metrics = compute_metrics_final(raw_data, num_classes=train_labels.max().item() + 1)
+            
+            result_computed = {
                 'samples_per_class': samples_per_class,
-                'accuracy_euclidean': mAcc,
-                'accuracy_euclidean_overall': global_acc_euc,
+                'accuracy_euclidean': metrics["macro_img_acc"],
+                'accuracy_euclidean_overall': metrics["overall_img_acc"]
             }
-            results.append(result)
+            results_computed.append(result_computed)
+
+            results_raw.append([{"sample_per_class": samples_per_class, **data} for data in raw_data])
+
             # Save intermediate results
-            os.makedirs('./results', exist_ok=True)
+            os.makedirs("/".join(csv_path_prefix.split("/")[:-1]), exist_ok=True)            
             if save_csv:
-                with open(csv_path, 'w', newline='') as f:
-                    writer = csv.DictWriter(f, fieldnames=result.keys())
-                    writer.writeheader()
-                    writer.writerows(results)
+                csv_path_computed = f"{csv_path_prefix}_computed.csv"
+                csv_path_raw = f"{csv_path_prefix}_raw.csv"
+
+                with open(csv_path_raw, 'a', newline='') as f:
+                    last_row = results_raw[-1]
+                    for row_dict in last_row:
+                        writer = csv.DictWriter(f, fieldnames=row_dict.keys())
+                        if f.tell() == 0:  # Check if file is empty to write header
+                            writer.writeheader()
+                        writer.writerow(row_dict)
+
+                with open(csv_path_computed, 'a', newline='') as f:
+                    writer = csv.DictWriter(f, fieldnames=result_computed.keys())
+                    if f.tell() == 0:  # Check if file is empty to write header
+                        writer.writeheader()
+                    writer.writerow(result_computed)
+
+
+
+                # with open(csv_path_computed, 'w', newline='') as f:
+                #     writer = csv.DictWriter(f, fieldnames=result_computed.keys())
+                #     writer.writeheader()
+                #     writer.writerows(results_computed)
+
+                # csv_path_raw = f"{csv_path_prefix}_raw.csv"
+                # with open(csv_path_raw, 'w', newline='') as f:
+                #     writer = csv.DictWriter(f, fieldnames=results_raw[0][0].keys())
+                #     writer.writeheader()
+                #     for batch in results_raw[-1]:
+                #         for line in batch:
+                #             writer.writerows(line)
+        
+        csv_path_plot = f"{csv_path_prefix}_plot.png"
+        plot_sweep(results_computed, save_path=f"{csv_path_plot}", save_only=True)
 
     return results
 
-def plot_sweep(results, save_only=False):
+def plot_sweep(results, save_path="sweep_samples_per_class_plot.png", save_only=False):
     x = [r['samples_per_class'] for r in results]
     plt.figure(figsize=(10, 7))
     plt.plot(x, [r['accuracy_euclidean'] for r in results], label='Euclidean')
@@ -114,7 +175,7 @@ def plot_sweep(results, save_only=False):
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig('sweep_samples_per_class_plot.png', dpi=300)
+    plt.savefig(f'{save_path}', dpi=300)
     if not save_only:
         plt.show()
     plt.close()
@@ -126,4 +187,4 @@ if __name__ == "__main__":
     experiment_name = "prototype"
 
     masks = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed/sam3_yolo_generic_mushroom_200/all/test/720/FungiTastic/test/720p"))
-    results = run_sweep(1, max_samples, seeds=num_seeds, experiment_name=experiment_name)
+    results = run_sweep(1, max_samples, seeds=num_seeds, experiment_name=experiment_name, masks=masks, save_csv=True)
