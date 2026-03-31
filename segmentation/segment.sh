@@ -20,5 +20,5 @@ cd "$ROOT_DIR"
 
 ## Segment the 2000 classes
 gbatch --gpus 1 --time 2:00:00 --name sam3-generic-train DATASET="$DATASET" DATASET_SIZE="$DATASET_SIZE" COMPUTE_IOU="$COMPUTE_IOU" PROMPT_MODE=generic GENERIC_PROMPT="$GENERIC_PROMPT" SPLIT=train "$PYTHON" segmentation/sam3_full.py
-gbatch --gpus 1 --time 2:00:00 --name sam3-generic-val DATASET="$DATASET" DATASET_SIZE="$DATASET_SIZE" COMPUTE_IOU="$COMPUTE_IOU" PROMPT_MODE=generic GENERIC_PROMPT="$GENERIC_PROMPT" SPLIT=val "$PYTHON" segmentation/sam3_full.py
-gbatch --gpus 1 --time 2:00:00 --name sam3-generic-test DATASET="$DATASET" DATASET_SIZE="$DATASET_SIZE" COMPUTE_IOU="$COMPUTE_IOU" PROMPT_MODE=generic GENERIC_PROMPT="$GENERIC_PROMPT" SPLIT=test "$PYTHON" segmentation/sam3_full.py
+# gbatch --gpus 1 --time 2:00:00 --name sam3-generic-val DATASET="$DATASET" DATASET_SIZE="$DATASET_SIZE" COMPUTE_IOU="$COMPUTE_IOU" PROMPT_MODE=generic GENERIC_PROMPT="$GENERIC_PROMPT" SPLIT=val "$PYTHON" segmentation/sam3_full.py
+# gbatch --gpus 1 --time 2:00:00 --name sam3-generic-test DATASET="$DATASET" DATASET_SIZE="$DATASET_SIZE" COMPUTE_IOU="$COMPUTE_IOU" PROMPT_MODE=generic GENERIC_PROMPT="$GENERIC_PROMPT" SPLIT=test "$PYTHON" segmentation/sam3_full.py

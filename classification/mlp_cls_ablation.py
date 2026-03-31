@@ -1,10 +1,16 @@
 import os
 import torch
 
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
 from tqdm import tqdm
 from pathlib import Path
 from rich.table import Table
 from rich.console import Console
+from typing import Any
 
 from utils import load_shards, save_run, seed_everything
 
@@ -21,6 +27,7 @@ MODEL_TRAIN = Path(f"facebook/{BACKBONE}/bfloat16_normal_{IMAGE_SIZE}/train")
 MODEL_VAL = Path(f"facebook/{BACKBONE}/bfloat16_normal_{IMAGE_SIZE}/val")
 MODEL_TEST = Path(f"facebook/{BACKBONE}/bfloat16_normal_{IMAGE_SIZE}/test")
 ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed")
+CLASSIFICATION_RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
 BATCH_SIZE = 64
 LEARNING_RATE = 3e-4
@@ -32,23 +39,30 @@ VAL_FRACTION = 0.15
 PROJECTION_DIM = 256
 HIDDEN_DIM = 512
 NUM_REGISTER_TOKENS = 4
+MAX_CONFUSION_MATRIX_CLASSES_TO_PRINT = 20
+CONFUSION_MATRIX_IMAGE_SUFFIX = ".png"
+CONFUSION_MATRIX_IMAGE_DPI = 220
+CONFUSION_MATRIX_RESULTS_DIR = CLASSIFICATION_RESULTS_DIR / EXPERIMENT_ID
 
 REGISTER_FEATURE_NAMES = tuple(f"register_tokens_{index}" for index in range(NUM_REGISTER_TOKENS))
 BASE_EXPERIMENTS: list[tuple[str, tuple[str, ...]]] = [
     ("cls", ("cls_tokens",)),
-    ("patch", ("mean_pooled_patch_tokens",)),
-    ("masked", ("mean_pooled_masked_patch_tokens",)),
-    ("cls+patch", ("cls_tokens", "mean_pooled_patch_tokens")),
-    ("cls+masked", ("cls_tokens", "mean_pooled_masked_patch_tokens")),
+    # ("patch", ("mean_pooled_patch_tokens",)),
+    # ("gt_masked", ("mean_pooled_gt_masked_patch_tokens",)),
+    # ("sam_masked", ("mean_pooled_sam_masked_patch_tokens",)),
+    # ("cls+patch", ("cls_tokens", "mean_pooled_patch_tokens")),
+    # ("cls+gt_masked", ("cls_tokens", "mean_pooled_gt_masked_patch_tokens")),
+    # ("cls+sam_masked", ("cls_tokens", "mean_pooled_sam_masked_patch_tokens")),
 ]
 REGISTER_EXPERIMENTS: list[tuple[str, tuple[str, ...]]] = [
-    (f"cls+register_{index}", ("cls_tokens", feature_name))
-    for index, feature_name in enumerate(REGISTER_FEATURE_NAMES)
-] + [
-    (f"register_{index}", (feature_name))
-    for index, feature_name in enumerate(REGISTER_FEATURE_NAMES)
-] + [
-    ("cls+masked+register_3", ("cls_tokens", "mean_pooled_masked_patch_tokens", "register_3")),
+#     (f"cls+register_{index}", ("cls_tokens", feature_name))
+#     for index, feature_name in enumerate(REGISTER_FEATURE_NAMES)
+# ] + [
+#     (f"register_{index}", (feature_name))
+#     for index, feature_name in enumerate(REGISTER_FEATURE_NAMES)
+# ] + [
+    # ("cls+gt_masked+register_3", ("cls_tokens", "mean_pooled_gt_masked_patch_tokens", "register_tokens_3")),
+    # ("cls+sam_masked+register_3", ("cls_tokens", "mean_pooled_sam_masked_patch_tokens", "register_tokens_3")),
 ]
 
 CONSOLE = Console()
@@ -124,6 +138,7 @@ def prepare_branches(
     device: torch.device,
 ) -> list[torch.Tensor]:
     branches = []
+    # print(f"Preparing branches: {names} with indices: {indices.shape if indices is not None else None} on device: {device}")
     for name in names:
         branch = features[name]
         if indices is not None:
@@ -146,6 +161,43 @@ def evaluate_split(
     return loss, accuracy
 
 
+def evaluate_split_metrics(
+    model: BranchMLP,
+    branches: list[torch.Tensor],
+    labels: torch.Tensor,
+    criterion: torch.nn.Module,
+) -> dict[str, Any]:
+    model.eval()
+    with torch.no_grad():
+        logits = model(branches)
+        loss = criterion(logits, labels).item()
+
+    labels_cpu = labels.detach().cpu()
+    predictions = logits.argmax(dim=1).detach().cpu()
+    num_classes = logits.shape[1]
+    confusion_matrix = torch.bincount(
+        labels_cpu * num_classes + predictions,
+        minlength=num_classes * num_classes,
+    ).reshape(num_classes, num_classes)
+    true_positive = confusion_matrix.diag().float()
+    predicted_support = confusion_matrix.sum(dim=0).float()
+    true_support = confusion_matrix.sum(dim=1).float()
+    precision_per_class = true_positive / predicted_support.clamp_min(1.0)
+    recall_per_class = true_positive / true_support.clamp_min(1.0)
+    valid_classes = (predicted_support + true_support) > 0
+
+    return {
+        "loss": loss,
+        "accuracy": (predictions == labels_cpu).float().mean().item(),
+        "precision": precision_per_class[valid_classes].mean().item(),
+        "recall": recall_per_class[valid_classes].mean().item(),
+        "confusion_matrix": confusion_matrix.tolist(),
+        "precision_per_class": precision_per_class.tolist(),
+        "recall_per_class": recall_per_class.tolist(),
+        "support_per_class": true_support.to(torch.int64).tolist(),
+    }
+
+
 def count_parameters(model: torch.nn.Module) -> int:
     return sum(parameter.numel() for parameter in model.parameters())
 
@@ -160,7 +212,7 @@ def run_experiment(
     train_indices: torch.Tensor,
     val_indices: torch.Tensor,
     device: torch.device,
-) -> dict[str, float | int | str]:
+) -> dict[str, Any]:
     seed_everything(SEED)
 
     X_train = prepare_branches(train_features, feature_names, train_indices, device)
@@ -214,30 +266,42 @@ def run_experiment(
                 break
 
     model.load_state_dict(best_state)
-    _, train_accuracy = evaluate_split(model, X_train, y_train, criterion)
-    _, val_accuracy = evaluate_split(model, X_val, y_val, criterion)
-    _, test_accuracy = evaluate_split(model, X_test, y_test, criterion)
+    train_metrics = evaluate_split_metrics(model, X_train, y_train, criterion)
+    val_metrics = evaluate_split_metrics(model, X_val, y_val, criterion)
+    test_metrics = evaluate_split_metrics(model, X_test, y_test, criterion)
 
     return {
         "name": name,
         "features": "+".join(feature_names),
         "params": count_parameters(model),
         "best_epoch": best_epoch,
-        "train_acc": train_accuracy,
-        "val_acc": val_accuracy,
-        "test_acc": test_accuracy,
+        "train_acc": train_metrics["accuracy"],
+        "train_precision": train_metrics["precision"],
+        "train_recall": train_metrics["recall"],
+        "val_acc": val_metrics["accuracy"],
+        "val_precision": val_metrics["precision"],
+        "val_recall": val_metrics["recall"],
+        "test_acc": test_metrics["accuracy"],
+        "test_precision": test_metrics["precision"],
+        "test_recall": test_metrics["recall"],
+        "test_confusion_matrix": test_metrics["confusion_matrix"],
+        "test_precision_per_class": test_metrics["precision_per_class"],
+        "test_recall_per_class": test_metrics["recall_per_class"],
+        "test_support_per_class": test_metrics["support_per_class"],
     }
 
 
-def print_results(results: list[dict[str, float | int | str]]) -> None:
+def print_results(results: list[dict[str, Any]]) -> None:
     table = Table(title="MLP CLS Ablation")
     table.add_column("Experiment")
     table.add_column("Features")
     table.add_column("Params", justify="right")
     table.add_column("Best Epoch", justify="right")
-    table.add_column("Train", justify="right")
-    table.add_column("Val", justify="right")
-    table.add_column("Test", justify="right")
+    table.add_column("Train Acc", justify="right")
+    table.add_column("Val Acc", justify="right")
+    table.add_column("Test Acc", justify="right")
+    table.add_column("Test Prec", justify="right")
+    table.add_column("Test Rec", justify="right")
 
     for result in sorted(results, key=lambda item: float(item["test_acc"]), reverse=True):
         table.add_row(
@@ -248,12 +312,105 @@ def print_results(results: list[dict[str, float | int | str]]) -> None:
             f"{float(result['train_acc']):.4f}",
             f"{float(result['val_acc']):.4f}",
             f"{float(result['test_acc']):.4f}",
+            f"{float(result['test_precision']):.4f}",
+            f"{float(result['test_recall']):.4f}",
         )
 
     CONSOLE.print(table)
 
 
-def save_results(results: list[dict[str, float | int | str]], run_meta: dict[str, int | float | str]) -> Path:
+def print_best_confusion_matrix(results: list[dict[str, Any]], label_ids: list[int]) -> None:
+    best_result = max(results, key=lambda item: float(item["test_acc"]))
+    confusion_matrix = list(best_result["test_confusion_matrix"])
+    num_classes = len(confusion_matrix)
+    if num_classes > MAX_CONFUSION_MATRIX_CLASSES_TO_PRINT:
+        CONSOLE.print(
+            f"Best test confusion matrix for {best_result['name']} not printed because num_classes={num_classes}. Stored in the run JSON with label_ids."
+        )
+        return
+
+    table = Table(title=f"Test Confusion Matrix: {best_result['name']}")
+    table.add_column("true\\pred")
+    for label_id in label_ids:
+        table.add_column(str(label_id), justify="right")
+    for label_id, row in zip(label_ids, confusion_matrix):
+        table.add_row(str(label_id), *[str(int(value)) for value in row])
+    CONSOLE.print(table)
+
+
+def prompt_overwrite(path: Path) -> bool:
+    if not path.exists():
+        return True
+    return input(f"{path.name} exists. Overwrite? [y/N]: ").strip().lower() == "y"
+
+
+def safe_filename(value: str) -> str:
+    return "".join(character if character.isalnum() or character in {"-", "_", "+"} else "_" for character in value)
+
+
+def save_confusion_matrix_plot(
+    name: str,
+    confusion_matrix: list[list[int]],
+    label_ids: list[int],
+    output_path: Path,
+) -> None:
+    num_classes = len(label_ids)
+    assert num_classes == len(confusion_matrix)
+    figure_size = max(8.0, num_classes * (0.55 if num_classes <= 20 else 0.35 if num_classes <= 40 else 0.24))
+    tick_size = 12 if num_classes <= 20 else 9 if num_classes <= 40 else 7
+    value_size = 10 if num_classes <= 20 else 0
+    max_value = max(max(row) for row in confusion_matrix)
+
+    plt.style.use("seaborn-v0_8-whitegrid")
+    fig, ax = plt.subplots(figsize=(figure_size + 2.0, figure_size))
+    image = ax.imshow(confusion_matrix, cmap="Blues")
+    fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
+    ax.set_title(f"{name} test confusion matrix")
+    ax.set_xlabel("Predicted label")
+    ax.set_ylabel("True label")
+    ax.set_xticks(range(num_classes), label_ids, rotation=45, ha="right")
+    ax.set_yticks(range(num_classes), label_ids)
+    ax.tick_params(axis="both", labelsize=tick_size)
+    ax.set_aspect("equal")
+
+    if value_size > 0:
+        threshold = max_value * 0.5
+        for row_index, row in enumerate(confusion_matrix):
+            for column_index, value in enumerate(row):
+                ax.text(
+                    column_index,
+                    row_index,
+                    str(int(value)),
+                    ha="center",
+                    va="center",
+                    fontsize=value_size,
+                    color="white" if value > threshold else "black",
+                )
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=CONFUSION_MATRIX_IMAGE_DPI, bbox_inches="tight")
+    plt.close(fig)
+
+
+def save_confusion_matrix_images(results: list[dict[str, Any]], label_ids: list[int], run_path: Path) -> list[Path]:
+    output_dir = CONFUSION_MATRIX_RESULTS_DIR / run_path.stem
+    output_dir.mkdir(parents=True, exist_ok=True)
+    saved_paths = []
+    for result in results:
+        output_path = output_dir / f"{safe_filename(str(result['name']))}_test_confusion_matrix{CONFUSION_MATRIX_IMAGE_SUFFIX}"
+        if not prompt_overwrite(output_path):
+            continue
+        save_confusion_matrix_plot(
+            name=str(result["name"]),
+            confusion_matrix=list(result["test_confusion_matrix"]),
+            label_ids=label_ids,
+            output_path=output_path,
+        )
+        saved_paths.append(output_path)
+    return saved_paths
+
+
+def save_results(results: list[dict[str, Any]], run_meta: dict[str, Any]) -> Path:
     rows = []
     for result in results:
         rows.append(
@@ -267,11 +424,21 @@ def save_results(results: list[dict[str, float | int | str]], run_meta: dict[str
                     "features": str(result["features"]),
                     "params": int(result["params"]),
                     "best_epoch": int(result["best_epoch"]),
+                    "test_confusion_matrix": result["test_confusion_matrix"],
+                    "test_precision_per_class": result["test_precision_per_class"],
+                    "test_recall_per_class": result["test_recall_per_class"],
+                    "test_support_per_class": result["test_support_per_class"],
                 },
                 "metrics": {
                     "train_acc": float(result["train_acc"]),
+                    "train_precision": float(result["train_precision"]),
+                    "train_recall": float(result["train_recall"]),
                     "val_acc": float(result["val_acc"]),
+                    "val_precision": float(result["val_precision"]),
+                    "val_recall": float(result["val_recall"]),
                     "test_acc": float(result["test_acc"]),
+                    "test_precision": float(result["test_precision"]),
+                    "test_recall": float(result["test_recall"]),
                 },
             }
         )
@@ -303,15 +470,20 @@ def main() -> None:
             train_data["mean_pooled_patch_tokens"],
             val_data["mean_pooled_patch_tokens"],
         ]).float(),
-        "mean_pooled_masked_patch_tokens": torch.cat([
-            train_data["mean_pooled_masked_patch_tokens"],
-            val_data["mean_pooled_masked_patch_tokens"],
+        "mean_pooled_gt_masked_patch_tokens": torch.cat([
+            train_data["mean_pooled_gt_masked_patch_tokens"],
+            val_data["mean_pooled_gt_masked_patch_tokens"],
+        ]).float(),
+        "mean_pooled_sam_masked_patch_tokens": torch.cat([
+            train_data["mean_pooled_sam_masked_patch_tokens"],
+            val_data["mean_pooled_sam_masked_patch_tokens"],
         ]).float(),
     }
     test_features = {
         "cls_tokens": test_data["cls_tokens"].float(),
         "mean_pooled_patch_tokens": test_data["mean_pooled_patch_tokens"].float(),
-        "mean_pooled_masked_patch_tokens": test_data["mean_pooled_masked_patch_tokens"].float(),
+        "mean_pooled_gt_masked_patch_tokens": test_data["mean_pooled_gt_masked_patch_tokens"].float(),
+        "mean_pooled_sam_masked_patch_tokens": test_data["mean_pooled_sam_masked_patch_tokens"].float(),
     }
     experiments = BASE_EXPERIMENTS
     register_meta: dict[str, int] = {}
@@ -335,6 +507,7 @@ def main() -> None:
         }
 
     train_labels_raw = torch.cat([train_data["labels"], val_data["labels"]])
+    label_ids = torch.unique(train_labels_raw, sorted=True).tolist()
     train_labels, test_labels = remap_labels_from_reference(train_labels_raw, test_data["labels"])
     train_indices, val_indices = make_stratified_split_indices(train_labels, VAL_FRACTION)
     run_meta = {
@@ -353,6 +526,7 @@ def main() -> None:
         "num_train_samples": int(len(train_indices)),
         "num_val_samples": int(len(val_indices)),
         "num_test_samples": int(len(test_labels)),
+        "label_ids": label_ids,
         "model_train": str(MODEL_TRAIN),
         "model_val": str(MODEL_VAL),
         "model_test": str(MODEL_TEST),
@@ -376,8 +550,12 @@ def main() -> None:
         )
 
     print_results(results)
+    print_best_confusion_matrix(results, label_ids)
     run_path = save_results(results, run_meta)
+    image_paths = save_confusion_matrix_images(results, label_ids, run_path)
     CONSOLE.print(f"Saved run to {run_path}")
+    if image_paths:
+        CONSOLE.print(f"Saved {len(image_paths)} confusion matrix images to {CONFUSION_MATRIX_RESULTS_DIR / run_path.stem}")
 
 
 if __name__ == "__main__":

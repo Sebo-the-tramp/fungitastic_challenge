@@ -31,14 +31,20 @@ def cosine_accuracy_topk(test_image_norm, test_labels, protos_norm, prototype_la
     correct = (topk_labels == test_labels.unsqueeze(1)).any(dim=1).sum().item()
     accuracy = correct / len(test_labels)
     mean_relative_top1_distances = (topk_values[:, :1] - topk_values[:, 1:]).mean(dim=0)
-    return accuracy, mean_relative_top1_distances
+
+    return accuracy, mean_relative_top1_distances, 0.0
 
 def single_prototypes(X_train_image_features, y_train, X_test_image_features, y_test):
     X_prototypes, y_prototypes = create_prototypes(X_train_image_features, y_train)    
     test_image_norm = F.normalize(X_test_image_features, p=2, dim=1)
     proto_norm = F.normalize(X_prototypes, p=2, dim=1)
-    cosine_acc_top1, mean_relative_top1_distances = cosine_accuracy_topk(test_image_norm, y_test, proto_norm, y_prototypes, k=1)
+    cosine_acc_top1, mean_relative_top1_distances, balanced_accuracy = cosine_accuracy_topk(test_image_norm, y_test, proto_norm, y_prototypes, k=1)
     print(f"Cosine similarity classification accuracy (top-1): {cosine_acc_top1:.4f}")
+    print(f"Cosine similarity classification BALANCED accuracy (top-1): {balanced_accuracy:.4f}")
+
+    cosine_acc_top5, mean_relative_top1_distances, balanced_accuracy = cosine_accuracy_topk(test_image_norm, y_test, proto_norm, y_prototypes, k=5)
+    print(f"Cosine similarity classification accuracy (top-5): {cosine_acc_top5:.4f}")
+    print(f"Cosine similarity classification BALANCED accuracy (top-1): {balanced_accuracy:.4f}")
 
 
 def main() -> None:

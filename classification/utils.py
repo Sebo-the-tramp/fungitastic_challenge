@@ -30,7 +30,8 @@ def load_shards(data_path: Path) -> dict[str, torch.Tensor | None]:
     cls_tokens = []
     register_tokens = []
     mean_pooled_patch_tokens = []
-    mean_pooled_masked_patch_tokens = []
+    mean_pooled_gt_masked_patch_tokens = []
+    mean_pooled_sam_masked_patch_tokens = []
     patch_features = []
     has_register_tokens = None
 
@@ -45,7 +46,8 @@ def load_shards(data_path: Path) -> dict[str, torch.Tensor | None]:
         if shard_register_tokens is not None:
             register_tokens.append(shard_register_tokens.float())
         mean_pooled_patch_tokens.append(shard_data["mean_pooled_patch_tokens"].float())
-        mean_pooled_masked_patch_tokens.append(shard_data["mean_pooled_masked_patch_tokens"].float())
+        mean_pooled_gt_masked_patch_tokens.append(shard_data["mean_pooled_gt_masked_patch_tokens"].float())
+        mean_pooled_sam_masked_patch_tokens.append(shard_data["mean_pooled_sam_masked_patch_tokens"].float())
         if "patch_features" in shard_data and shard_data["patch_features"] is not None:
             patch_features.append(shard_data["patch_features"].float())
 
@@ -54,10 +56,28 @@ def load_shards(data_path: Path) -> dict[str, torch.Tensor | None]:
         "cls_tokens": torch.cat(cls_tokens),
         "register_tokens": torch.cat(register_tokens).to("cpu") if register_tokens else None,
         "mean_pooled_patch_tokens": torch.cat(mean_pooled_patch_tokens).to("cpu"),
-        "mean_pooled_masked_patch_tokens": torch.cat(mean_pooled_masked_patch_tokens).to("cpu"),
+        "mean_pooled_gt_masked_patch_tokens": torch.cat(mean_pooled_gt_masked_patch_tokens).to("cpu"),
+        "mean_pooled_sam_masked_patch_tokens": torch.cat(mean_pooled_sam_masked_patch_tokens).to("cpu"),
         "patch_features": torch.cat(patch_features) if patch_features else None,
     }
 
+
+def balance_data(data: dict[str, torch.Tensor | None], seed: int, samples_per_class: int) -> dict[str, torch.Tensor | None]:
+    labels = data["labels"]
+    unique_labels = torch.unique(labels)
+    balanced_indices = []
+
+    for label in unique_labels:
+        label_indices = torch.where(labels == label)[0]
+        if len(label_indices) > samples_per_class:
+            sampled_indices = torch.tensor(random.sample(label_indices.tolist(), samples_per_class))
+        else:
+            sampled_indices = label_indices
+        balanced_indices.append(sampled_indices)
+
+    balanced_indices = torch.cat(balanced_indices)
+    balanced_data = {key: (value[balanced_indices] if value is not None else None) for key, value in data.items()}
+    return balanced_data
 
 def remap_labels(y_train: torch.Tensor, y_test: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     train_labels = torch.unique(y_train, sorted=True)

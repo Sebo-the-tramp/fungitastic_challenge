@@ -13,7 +13,7 @@ from transformers import AutoImageProcessor, AutoModel
 import torchvision.transforms.functional as TF
 import torch.nn.functional as F
 
-import matplotlib.pyplot as plt
+from utils import read_segments, polygon_to_mask
 
 PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2")
 DATASET_ROOT = Path("/data0/sebastian.cavada/datasets/FungiTastic")
@@ -51,14 +51,37 @@ SEG_TASK = "binary"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 PIN_MEMORY = DEVICE == "cuda"
 BACKGROUND_TYPES = [
-    # "crop",
-    # "crop_black",
-    # "masked_black",
-    # "masked_blurred", # not needed for now what I am doing is a different analysis now
+    "crop",
+    "crop_black",
+    "masked_black",
+    "masked_blurred",
     "normal",
 ]
-BACKGROUND = "normal"
+BACKGROUND = os.environ.get("BACKGROUND", "normal")
 MIN_BOX_AREA = 2500
+
+USE_SAM_MASKS = True
+SAM_MASK_DIR = PROJECT_ROOT / "data_processed" / "sam3_yolo_generic_mushroom_200" / "all" / SPLIT / "720" / "FungiTastic" / SPLIT / "720p"
+
+def load_sam_mask_batched(images_path:list[str], images:list[Image]) -> np.ndarray:
+
+    sam_masks = []
+
+    for image_path, image in zip(images_path, images):
+        image_id = Path(image_path).stem
+        img_width, img_height = image.size
+        
+        segment_path = SAM_MASK_DIR / f"{image_id}.txt"
+        segments, _ = read_segments(segment_path)
+
+        if segments is not None:
+            bit_mask = polygon_to_mask(segments, img_width, img_height)
+            sam_masks.append(torch.tensor(bit_mask.astype(bool)).unsqueeze(0))  # Add channel dimension for compatibility
+        else:
+            print(f"No SAM segments found for {image_id}, using empty mask.")
+            raise NotImplementedError("SAM mask processing is not implemented for missing segments. Please ensure SAM masks are generated for all images or handle missing cases appropriately.")            
+
+    return sam_masks
 
 def collate_batch(batch):
     images = [item[0] for item in batch]
@@ -80,7 +103,8 @@ def flush_shard(
     cls_token: list[torch.Tensor],
     register_tokens: list[torch.Tensor] | None,
     mean_pooled_patch_tokens: list[torch.Tensor],
-    mean_pooled_masked_patch_tokens: list[torch.Tensor],
+    mean_pooled_gt_masked_patch_tokens: list[torch.Tensor],
+    mean_pooled_sam_masked_patch_tokens: list[torch.Tensor],
     patch_feature_batches: list[torch.Tensor], #optional, can be empty if not saving patch features    
 ) -> int:
     if not file_paths:
@@ -96,7 +120,8 @@ def flush_shard(
         "cls_token": torch.cat(cls_token, dim=0).contiguous(),
         "register_tokens": torch.cat(register_tokens, dim=0).contiguous() if register_tokens else None,
         "mean_pooled_patch_tokens": torch.cat(mean_pooled_patch_tokens, dim=0).contiguous(), 
-        "mean_pooled_masked_patch_tokens": torch.cat(mean_pooled_masked_patch_tokens, dim=0).contiguous(),
+        "mean_pooled_gt_masked_patch_tokens": torch.cat(mean_pooled_gt_masked_patch_tokens, dim=0).contiguous(),
+        "mean_pooled_sam_masked_patch_tokens": torch.cat(mean_pooled_sam_masked_patch_tokens, dim=0).contiguous(),
         "patch_features": torch.cat(patch_feature_batches, dim=0).contiguous() if patch_feature_batches else None,        
     }
     torch.save(shard, output_dir / f"shard_{shard_index:05d}.pt")
@@ -104,7 +129,8 @@ def flush_shard(
     labels.clear()
     cls_token.clear()
     mean_pooled_patch_tokens.clear()
-    mean_pooled_masked_patch_tokens.clear()
+    mean_pooled_gt_masked_patch_tokens.clear()
+    mean_pooled_sam_masked_patch_tokens.clear()
     patch_feature_batches.clear()
     register_tokens.clear() if register_tokens else None
 
@@ -121,7 +147,8 @@ def get_bounding_boxes(bool_mask: np.ndarray) -> list[tuple[int, int, int, int]]
     uint8_mask = (bool_mask.astype(np.uint8)) * 255
     contours, _ = cv2.findContours(uint8_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     bounding_boxes = [tuple(map(int, cv2.boundingRect(contour))) for contour in contours]
-    assert bounding_boxes
+    if bounding_boxes == []:
+        return []
     bounding_boxes = sorted(bounding_boxes, key=lambda box: (box[1], box[0], box[3], box[2]))
     filtered_boxes = [box for box in bounding_boxes if box[2] * box[3] >= MIN_BOX_AREA]
     return filtered_boxes if filtered_boxes else [max(bounding_boxes, key=lambda box: box[2] * box[3])]
@@ -130,19 +157,19 @@ def pre_process_images(images: list[Image.Image], masks: list[list[bool]], label
     if background == "normal":
         return images, labels
     
-    elif background == "masked_black":        
+    elif background == "masked_black":
         masked_images = []
-        for img, msk in zip(images, masks):            
+        for img, msk in zip(images, masks):
             msk_uint8 = msk.to(torch.uint8) * 255
             mask_pil = TF.to_pil_image(msk_uint8).convert("L")
             black_bg = Image.new(img.mode, img.size, 0) 
             masked_img = Image.composite(img, black_bg, mask_pil)
             masked_images.append(masked_img)
-        return masked_images, labels
+        return masked_images, labels, masks
     
     elif background == "masked_blurred":
         masked_images = []
-        for img, msk in zip(images, masks):            
+        for img, msk in zip(images, masks):
             msk_uint8 = msk.to(torch.uint8) * 255
     
             # 2. Convert directly to a PIL Image 
@@ -155,21 +182,68 @@ def pre_process_images(images: list[Image.Image], masks: list[list[bool]], label
             masked_img = Image.composite(img, blurred_bg, mask_pil)
 
             masked_images.append(masked_img)
-        return masked_images, labels
+        return masked_images, labels, masks
      
     elif background == "crop":
-
         cropped_imges = []
         new_labels = []
+        new_masks = []
         for img, msk, label in zip(images, masks, labels):
             bounding_boxes = get_bounding_boxes(np.array(msk.squeeze(0), dtype=bool))
-            for box in bounding_boxes[:2]:  # Limit to the two largest boxes
+            if bounding_boxes == []:
+                cropped_imges.append(img)
+                new_labels.append(label)
+                new_masks.append(msk)
+                continue
+            for box in bounding_boxes[:4]:  # Limit to the two largest boxes
                 x, y, w, h = box
+
+                # let's add some padding to the box to give the model some context, but not too much to include too much background
+                padding = int(0.1 * min(w, h))
+                x = max(x - padding, 0)
+                y = max(y - padding, 0)
+                w = min(w + 2 * padding, img.width - x)
+                h = min(h + 2 * padding, img.height - y)
                 cropped_img = img.crop((x, y, x + w, y + h))
                 cropped_imges.append(cropped_img)
                 new_labels.append(label)
+                new_masks.append(msk[:, y:y+h, x:x+w])
 
-        return cropped_imges, new_labels
+        return cropped_imges, new_labels, new_masks
+
+    elif background == "crop_black":
+        cropped_imges = []
+        new_labels = []
+        new_masks = []
+        for img, msk, label in zip(images, masks, labels):
+            msk_uint8 = msk.to(torch.uint8) * 255
+            mask_pil = TF.to_pil_image(msk_uint8).convert("L")
+            black_bg = Image.new(img.mode, img.size, 0) 
+            masked_img = Image.composite(img, black_bg, mask_pil)
+
+            bounding_boxes = get_bounding_boxes(np.array(msk.squeeze(0), dtype=bool))
+            if bounding_boxes == []:
+                cropped_imges.append(masked_img)
+                new_labels.append(label)
+                new_masks.append(msk)
+                continue
+            
+            for box in bounding_boxes[:4]:  # Limit to the two largest boxes
+                x, y, w, h = box
+
+                # let's add some padding to the box to give the model some context, but not too much to include too much background
+                padding = int(0.1 * min(w, h))
+                x = max(x - padding, 0)
+                y = max(y - padding, 0)
+                w = min(w + 2 * padding, img.width - x)
+                h = min(h + 2 * padding, img.height - y)
+                cropped_img = masked_img.crop((x, y, x + w, y + h))
+
+                cropped_imges.append(cropped_img)
+                new_labels.append(label)
+                new_masks.append(msk[:, y:y+h, x:x+w])
+
+        return cropped_imges, new_labels, new_masks
 
     else:
         raise ValueError(f"Unknown background type: {background}")
@@ -187,6 +261,8 @@ def compute_mean_pooled_masked_patch_tokens(
     image_size: tuple[int, int] = (224, 224),
 ) -> torch.Tensor:
     B, H_p, W_p, D = patch_features.shape
+
+    print(f"Mask shape 0 {masks[0].shape}, expected ({image_size[1]}, {image_size[0]})")
 
     masks_resized = [torch.from_numpy(resize_mask_to_image(mask[0].numpy(), image_size)) for mask in masks]
 
@@ -233,7 +309,7 @@ def main() -> None:
     )
    
     assert MODEL_NAME in HUGGINGFACE_MODELS, MODEL_NAME
-    processor = AutoImageProcessor.from_pretrained(MODEL_NAME, image_size=IMAGE_SIZE)
+    processor = AutoImageProcessor.from_pretrained(MODEL_NAME, size={"height": IMAGE_SIZE, "width": IMAGE_SIZE})
     model = AutoModel.from_pretrained(
         MODEL_NAME,
         # device_map={"": 0},
@@ -260,16 +336,18 @@ def main() -> None:
     shard_register_tokens_batches: list[torch.Tensor] = []  # only for models with register tokens, otherwise will be empty and not saved
     shard_patch_feature_batches: list[torch.Tensor] = []
     shard_mean_pooled_patch_tokens: list[torch.Tensor] = []
-    shard_mean_pooled_masked_patch_tokens: list[torch.Tensor] = []
+    shard_mean_pooled_gt_masked_patch_tokens: list[torch.Tensor] = []
+    shard_mean_pooled_sam_masked_patch_tokens: list[torch.Tensor] = []
 
     buffered_items = 0
 
     with torch.inference_mode():
-        for images, masks, labels, file_paths in tqdm(dataloader, desc="Processing batches", unit="batch"):
+        for images, gt_masks, labels, file_paths in tqdm(dataloader, desc="Processing batches", unit="batch"):
 
-            images, labels = pre_process_images(images, masks, labels, BACKGROUND)
+            images, labels, gt_masks = pre_process_images(images, gt_masks, labels, BACKGROUND)
             print(images[0].size)
             itorchuts = processor(images=images, return_tensors="pt")
+            print(itorchuts["pixel_values"].shape)
             
             moved_itorchuts = {}
             for key, value in itorchuts.items():
@@ -304,8 +382,20 @@ def main() -> None:
             # computing mean_pooled_patch_tokens
             mean_pooled_patch_tokens = compute_mean_pooled_patch_tokens(patch_features)
 
-            # computing mean_pooled_masked_patch_tokens
-            mean_pooled_masked_patch_tokens = compute_mean_pooled_masked_patch_tokens(patch_features, masks, patch_size, image_size=(img_width, img_height))
+            # computing mean_pooled_gt_masked_patch_tokens
+            # there seems to be something wrong with the img_width/img_heid
+            mean_pooled_gt_masked_patch_tokens = compute_mean_pooled_masked_patch_tokens(patch_features, gt_masks, patch_size, image_size=(img_width, img_height))
+
+            # can't use with the crops for now!
+            # if USE_SAM_MASKS:
+            #     sam_masks = load_sam_mask_batched(file_paths, images)  # Implement this function to get SAM masks for the images
+            #     # kind of monkey patching to get sam mask correctly resized as well
+            #     _, _, sam_masks = pre_process_images(images, sam_masks, labels, BACKGROUND)
+            #     mean_pooled_sam_masked_patch_tokens = compute_mean_pooled_masked_patch_tokens(patch_features, sam_masks, patch_size, image_size=(img_width, img_height))
+            # else:
+            #     raise NotImplementedError("SAM mask processing is not implemented in this version. Set USE_SAM_MASKS to False or implement the SAM mask loading and processing.")
+            
+            mean_pooled_sam_masked_patch_tokens = torch.zeros_like(mean_pooled_gt_masked_patch_tokens)  # Placeholder if not using SAM masks
 
             # saving or not full patch features (heavy on storage, but useful for future analysis)
             if save_patch_features:
@@ -317,7 +407,8 @@ def main() -> None:
             shard_labels.extend(int(label) if label is not None else None for label in labels)
             shard_cls_tokens_batches.append(cls_tokens)
             shard_mean_pooled_patch_tokens.append(mean_pooled_patch_tokens)
-            shard_mean_pooled_masked_patch_tokens.append(mean_pooled_masked_patch_tokens)
+            shard_mean_pooled_gt_masked_patch_tokens.append(mean_pooled_gt_masked_patch_tokens)
+            shard_mean_pooled_sam_masked_patch_tokens.append(mean_pooled_sam_masked_patch_tokens)  # placeholder for future SAM masked features, not computed in this version
 
             if patches_features is not None:
                 shard_patch_feature_batches.append(patches_features)
@@ -332,7 +423,8 @@ def main() -> None:
                     cls_token=shard_cls_tokens_batches,
                     register_tokens=shard_register_tokens_batches,
                     mean_pooled_patch_tokens=shard_mean_pooled_patch_tokens,
-                    mean_pooled_masked_patch_tokens=shard_mean_pooled_masked_patch_tokens,
+                    mean_pooled_gt_masked_patch_tokens=shard_mean_pooled_gt_masked_patch_tokens,
+                    mean_pooled_sam_masked_patch_tokens=shard_mean_pooled_sam_masked_patch_tokens,
                     patch_feature_batches=shard_patch_feature_batches,
                 )
                 buffered_items = 0
@@ -345,10 +437,11 @@ def main() -> None:
         cls_token=shard_cls_tokens_batches,
         register_tokens=shard_register_tokens_batches,
         mean_pooled_patch_tokens=shard_mean_pooled_patch_tokens,
-        mean_pooled_masked_patch_tokens=shard_mean_pooled_masked_patch_tokens,
-        patch_feature_batches=shard_patch_feature_batches,                    
+        mean_pooled_gt_masked_patch_tokens=shard_mean_pooled_gt_masked_patch_tokens,
+        mean_pooled_sam_masked_patch_tokens=shard_mean_pooled_sam_masked_patch_tokens,
+        patch_feature_batches=shard_patch_feature_batches,
     )
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":    
     main()
