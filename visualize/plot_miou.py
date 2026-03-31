@@ -17,9 +17,10 @@ DPI = 300
 STYLE = "seaborn-v0_8-whitegrid"
 LINE_WIDTH = 3.0
 ALPHA = 0.18
-BAR_COLOR = "#4a90e2"
-BAR_EDGE = "#2f6fb1"
-BAR_ALPHA = 0.9
+TITLE_FONT_SIZE = 40
+COUNT_LINE_COLOR = "#374151"
+COUNT_FILL_COLOR = "#9ca3af"
+COUNT_ALPHA = 0.22
 COLORS = [
     "#1b9e77",
     "#d95f02",
@@ -34,6 +35,14 @@ COLORS = [
 ]
 SPECIAL_STYLES = {
     "mlp": {"color": "#c44e52", "linestyle": "--"},
+}
+PCA_WHITE_PREFIX = "prototype_pca_white_"
+PCA_WHITE_KEEP = "prototype_pca_white_512"
+REFERENCE_LINES = {
+    "mIoU": [
+        ("GENERAL (oracle class)", 0.8937, "#4c566a"),
+        ("SPECIFIC (oracle class)", 0.5522, "#8f5e3c"),
+    ],
 }
 PLOTS = [
     ("mIoU", "plot_miou_runs.png", "mIoU (%)", "mIoU across runs"),
@@ -73,7 +82,13 @@ def aggregate_folder(folder: Path, metric: str) -> tuple[np.ndarray, np.ndarray,
 
 def result_folders() -> list[Path]:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    folders = [folder for folder in sorted(RESULTS_DIR.iterdir()) if folder.is_dir() and list(folder.glob("*_computed.csv"))]
+    folders = [
+        folder
+        for folder in sorted(RESULTS_DIR.iterdir())
+        if folder.is_dir()
+        and list(folder.glob("*_computed.csv"))
+        and (not folder.name.startswith(PCA_WHITE_PREFIX) or folder.name == PCA_WHITE_KEEP)
+    ]
     assert folders, f"No result folders with *_computed.csv in {RESULTS_DIR}"
     return folders
 
@@ -99,15 +114,22 @@ def reference_raw_csv_path(folders: list[Path]) -> Path:
     raise AssertionError(f"No *_raw.csv found in {RESULTS_DIR}")
 
 
-def total_objects_per_sample(folders: list[Path]) -> tuple[np.ndarray, np.ndarray]:
-    counts: dict[int, int] = {}
+def classes_with_at_least_x_images(folders: list[Path]) -> tuple[np.ndarray, np.ndarray]:
+    max_sample = 0
+    class_counts: dict[int, int] = {}
     with reference_raw_csv_path(folders).open(newline="") as handle:
         for row in csv.DictReader(handle):
             sample = int(row["sample_per_class"])
-            counts[sample] = counts.get(sample, 0) + 1
-    samples = np.array(sorted(counts), dtype=np.int64)
-    totals = np.array([counts[int(sample)] for sample in samples], dtype=np.int64)
-    assert len(samples), f"No sample_per_class values found in raw csv under {RESULTS_DIR}"
+            if sample > max_sample:
+                max_sample = sample
+                class_counts = {}
+            if sample == max_sample:
+                label = int(row["gt_class"])
+                class_counts[label] = class_counts.get(label, 0) + 1
+    assert max_sample > 0, f"No sample_per_class values found in raw csv under {RESULTS_DIR}"
+    counts = np.array(list(class_counts.values()), dtype=np.int64)
+    samples = np.arange(1, max_sample + 1, dtype=np.int64)
+    totals = (counts[:, None] >= samples[None, :]).sum(axis=0)
     return samples, totals
 
 
@@ -132,6 +154,23 @@ def apply_style() -> None:
     )
 
 
+def add_reference_lines(ax: plt.Axes, metric: str) -> None:
+    for name, value, color in REFERENCE_LINES.get(metric, []):
+        y = value * 100.0
+        ax.axhline(y, color=color, linewidth=2.0, linestyle=":")
+        ax.annotate(
+            f"{name} {value:.4f}",
+            xy=(1.0, y),
+            xycoords=("axes fraction", "data"),
+            xytext=(-8, 3),
+            textcoords="offset points",
+            ha="right",
+            va="bottom",
+            color=color,
+            fontsize=12,
+        )
+
+
 def plot_metric_panel(
     ax: plt.Axes,
     folders: list[Path],
@@ -149,8 +188,9 @@ def plot_metric_panel(
         label = f"{folder.name} (n={num_runs})"
         ax.plot(x, mean, color=color, linewidth=LINE_WIDTH, linestyle=linestyle, label=label)
         ax.fill_between(x, mean - std, mean + std, color=color, alpha=ALPHA)
+    add_reference_lines(ax, metric)
     ax.set_ylabel(ylabel)
-    ax.set_title(title)
+    ax.set_title(title, fontsize=TITLE_FONT_SIZE)
     ax.grid(True, axis="y", color="#d1d5db", linewidth=1.0)
     ax.grid(False, axis="x")
     ax.tick_params(axis="x", labelbottom=False)
@@ -158,10 +198,11 @@ def plot_metric_panel(
         ax.legend(frameon=False, ncols=2, loc="lower right")
 
 
-def plot_total_objects(ax: plt.Axes, samples: np.ndarray, totals: np.ndarray) -> None:
-    ax.bar(samples, totals, width=0.9, color=BAR_COLOR, edgecolor=BAR_EDGE, linewidth=0.5, alpha=BAR_ALPHA)
-    ax.set_xlabel("Samples per class")
-    ax.set_ylabel("Total objects")
+def plot_classes_with_at_least_x(ax: plt.Axes, samples: np.ndarray, totals: np.ndarray) -> None:
+    ax.step(samples, totals, where="post", color=COUNT_LINE_COLOR, linewidth=2.6)
+    ax.fill_between(samples, totals, step="post", color=COUNT_FILL_COLOR, alpha=COUNT_ALPHA)
+    ax.set_xlabel("x images per class")
+    ax.set_ylabel("Classes with >= x")
     ax.yaxis.set_major_formatter(StrMethodFormatter("{x:,.0f}"))
     ax.grid(True, axis="y", color="#d1d5db", linewidth=1.0)
     ax.grid(False, axis="x")
@@ -173,7 +214,7 @@ def make_panel_figure(
     folders: list[Path],
     styles: dict[str, dict[str, str]],
     samples: np.ndarray,
-    totals: np.ndarray,
+    class_counts: np.ndarray,
     metric: str,
     ylabel: str,
     title: str,
@@ -184,7 +225,7 @@ def make_panel_figure(
     ax_metric = fig.add_subplot(grid[0])
     ax_bar = fig.add_subplot(grid[1], sharex=ax_metric)
     plot_metric_panel(ax_metric, folders, styles, metric, ylabel, title, show_legend=True)
-    plot_total_objects(ax_bar, samples, totals)
+    plot_classes_with_at_least_x(ax_bar, samples, class_counts)
     return fig
 
 
@@ -192,13 +233,13 @@ def main() -> None:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     folders = result_folders()
     styles = folder_styles(folders)
-    samples, totals = total_objects_per_sample(folders)
+    samples, class_counts = classes_with_at_least_x_images(folders)
     for metric, output_name, ylabel, title in PLOTS:
         output_path = RESULTS_DIR / output_name
         if not prompt_overwrite(output_path):
             print(f"Skipped {output_path}")
             continue
-        fig = make_panel_figure(folders, styles, samples, totals, metric, ylabel, title)
+        fig = make_panel_figure(folders, styles, samples, class_counts, metric, ylabel, title)
         fig.savefig(output_path, dpi=DPI, bbox_inches="tight")
         print(f"Saved {output_path}")
         plt.close(fig)

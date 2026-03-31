@@ -15,7 +15,7 @@ SEED = 7
 SEED_GENERATOR = 42
 MIN_SAMPLES = 1
 MAX_SAMPLES = 200
-NUM_SEEDS = 2
+NUM_SEEDS = 20
 BATCH_SIZE = 256
 LEARNING_RATE = 1e-3
 WEIGHT_DECAY = 1e-4
@@ -24,6 +24,7 @@ PATIENCE = 10
 MIN_DELTA = 1e-4
 VAL_FRACTION = 0.2
 HIDDEN_DIM = 256
+SAVE_NETWORKS = False
 
 BACKBONE = os.environ.get("BACKBONE", "dinov3-vit7b16-pretrain-lvd1689m")
 IMAGE_SIZE = int(os.environ.get("IMAGE_SIZE", "448"))
@@ -152,11 +153,12 @@ def train_or_load_mlp(
     checkpoint_path: Path,
     seed: int,
     samples_per_class: int,
+    save_networks: bool,
     overwrite_networks: bool,
 ) -> tuple[torch.nn.Module, torch.Tensor, torch.Tensor, int, float, float, bool]:
     input_dim = int(train_features.shape[1])
 
-    if checkpoint_path.exists() and not overwrite_networks:
+    if save_networks and checkpoint_path.exists() and not overwrite_networks:
         checkpoint = torch.load(checkpoint_path, map_location="cpu")
         assert checkpoint["backbone"] == BACKBONE
         assert checkpoint["image_size"] == IMAGE_SIZE
@@ -223,25 +225,26 @@ def train_or_load_mlp(
     train_acc = evaluate_split(model, X_train, y_train, criterion)[1]
     val_acc = evaluate_split(model, X_val, y_val, criterion)[1]
 
-    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(
-        {
-            "seed": seed,
-            "samples_per_class": samples_per_class,
-            "backbone": BACKBONE,
-            "image_size": IMAGE_SIZE,
-            "input_dim": input_dim,
-            "num_classes": num_classes,
-            "hidden_dim": HIDDEN_DIM,
-            "best_epoch": best_epoch,
-            "train_acc": train_acc,
-            "val_acc": val_acc,
-            "mean": mean.detach().cpu(),
-            "std": std.detach().cpu(),
-            "model_state_dict": clone_state_dict(model),
-        },
-        checkpoint_path,
-    )
+    if save_networks:
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(
+            {
+                "seed": seed,
+                "samples_per_class": samples_per_class,
+                "backbone": BACKBONE,
+                "image_size": IMAGE_SIZE,
+                "input_dim": input_dim,
+                "num_classes": num_classes,
+                "hidden_dim": HIDDEN_DIM,
+                "best_epoch": best_epoch,
+                "train_acc": train_acc,
+                "val_acc": val_acc,
+                "mean": mean.detach().cpu(),
+                "std": std.detach().cpu(),
+                "model_state_dict": clone_state_dict(model),
+            },
+            checkpoint_path,
+        )
     return model, mean, std, best_epoch, train_acc, val_acc, False
 
 
@@ -295,6 +298,14 @@ def ask_overwrite_networks() -> bool:
     return answer == "y"
 
 
+def ask_save_networks() -> bool:
+    default_prompt = "Y/n" if SAVE_NETWORKS else "y/N"
+    answer = input(f"Save trained MLP checkpoints? [{default_prompt}]: ").strip().lower()
+    if not answer:
+        return SAVE_NETWORKS
+    return answer == "y"
+
+
 def seed_computed_csv_path(seed: int) -> Path:
     return RESULTS_DIR / f"{seed}_computed.csv"
 
@@ -328,6 +339,7 @@ def run_sweep(
     max_samples: int,
     seeds: list[int],
     masks: dict[str, dict[str, torch.Tensor]],
+    save_networks: bool,
     overwrite_networks: bool,
 ) -> list[dict[str, int | float]]:
     all_results = []
@@ -367,6 +379,7 @@ def run_sweep(
                     checkpoint_path=checkpoint_path,
                     seed=seed,
                     samples_per_class=samples_per_class,
+                    save_networks=save_networks,
                     overwrite_networks=overwrite_networks,
                 )
                 _, metrics_data = mlp_method(
@@ -406,7 +419,8 @@ def run_sweep(
 
 def main() -> None:
     seed_everything(SEED)
-    overwrite_networks = ask_overwrite_networks()
+    save_networks = ask_save_networks()
+    overwrite_networks = ask_overwrite_networks() if save_networks else False
     num_seeds = list(map(int, np.random.default_rng(SEED_GENERATOR).integers(0, 10000, size=NUM_SEEDS)))
     masks = load_masks(MASKS_PATH)
     results = run_sweep(
@@ -414,6 +428,7 @@ def main() -> None:
         max_samples=MAX_SAMPLES,
         seeds=num_seeds,
         masks=masks,
+        save_networks=save_networks,
         overwrite_networks=overwrite_networks,
     )
     print_summary(results)

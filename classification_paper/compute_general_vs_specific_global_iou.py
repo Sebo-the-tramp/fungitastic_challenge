@@ -1,12 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-from rich.table import Table
-from rich.console import Console
 import torch
 import os
-import csv
+import sys
 from tqdm import tqdm
+from typing import Any, Sequence
+
+from PIL import Image
+from torch.utils.data import DataLoader
 
 from utils import load_shards, seed_everything, balance_data, remap_labels, load_masks
 
@@ -15,124 +17,93 @@ SEED = 7
 BACKBONE = os.environ.get("BACKBONE", "dinov3-vit7b16-pretrain-lvd1689m")
 IMAGE_SIZE = os.environ.get("IMAGE_SIZE", 448)
 
+PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2")
+DATASET_ROOT = Path("/data0/sebastian.cavada/datasets/FungiTastic")
+
+DATA_SUBSET = os.environ.get("DATA_SUBSET", "all")
+SPLIT = os.environ.get("SPLIT", "test")
+DATASET_SIZE = os.environ.get("DATASET_SIZE", "720")
+TASK = os.environ.get("TASK", "closed")
+BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "1"))
+NUM_WORKERS = int(os.environ.get("NUM_WORKERS", "2"))
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+MODEL_DTYPE = torch.bfloat16 if DEVICE == "cuda" else torch.float32
+PIN_MEMORY = DEVICE == "cuda"
+POLYGON_CLOSE_KERNEL_SIZE = 3
+
 MODEL_TRAIN = Path(f"facebook/{BACKBONE}/bfloat16_normal_{IMAGE_SIZE}/train")
 MODEL_TEST = Path(f"facebook/{BACKBONE}/bfloat16_normal_{IMAGE_SIZE}/test")
 ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed")
 CLASSIFICATION_RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
+sys.path.append(str(PROJECT_ROOT / "FungiTastic"))
+from dataset.mask_fungi import MaskFungiTastic
+from dataset.utils.mask_vis import get_image_shape, resize_mask_to_image
 
-def prototype_method(train_data: dict[str, torch.Tensor | None], 
-    test_data: dict[str, torch.Tensor | None], sam_masks) -> None:
+def collate_batch(
+    batch: list[tuple[Image.Image, np.ndarray, int | None, str, list[str]]]
+) -> tuple[list[Image.Image], list[np.ndarray], list[int | None], list[str]]:
+    images = [item[0] for item in batch]
+    masks = [item[1] for item in batch] # this is not present
+    labels = [item[2] for item in batch]
+    file_paths = [item[3] for item in batch]
+    return images, masks, labels, file_paths
 
-    train_labels = train_data['labels']
-    test_labels = test_data['labels']
+# load the dataset
+dataset = MaskFungiTastic(
+    root=str(DATASET_ROOT),
+    data_subset=DATA_SUBSET,
+    split=SPLIT,
+    size=DATASET_SIZE,
+    task=TASK,
+    transform=None,
+    seg_task="binary",
+)
 
-    train_features = train_data['cls_tokens']
-    test_features = test_data['cls_tokens']
+dataloader_kwargs: dict[str, Any] = {
+    "batch_size": BATCH_SIZE,
+    "shuffle": False,
+    "num_workers": NUM_WORKERS,
+    "collate_fn": collate_batch,
+    "pin_memory": PIN_MEMORY,
+}
+if NUM_WORKERS > 0:
+    dataloader_kwargs["persistent_workers"] = True
+    dataloader_kwargs["prefetch_factor"] = 2
+dataloader = DataLoader(dataset, **dataloader_kwargs)
 
-    train_image_file_names = [file_path.split("/")[-1].replace(".txt", "") for file_path in train_data['file_paths']]
-    test_image_file_names = [file_path.split("/")[-1].replace(".txt", "") for file_path in test_data['file_paths']]
 
-    gt_masks_train = train_data['gt_masks']
-    gt_masks_test = test_data['gt_masks']
+def compute_metric(masks):
 
-    sam_masks_train = torch.stack([sam_masks.get(file_name, torch.zeros_like(gt_masks_train[0])) for file_name in train_image_file_names])
-    sam_masks_test = torch.stack([sam_masks.get(file_name, torch.zeros_like(gt_masks_test[0])) for file_name in test_image_file_names])
+    class_aware_iou = {}
 
-    num_classes = train_labels.max().item() + 1
-    feature_dim = train_features.size(1)
+    progress = tqdm(dataloader, desc="sam3", unit="batch")
 
-    # Compute mean and std for prototype methods
-    mean = torch.zeros(num_classes, feature_dim, dtype=train_features.dtype, device=train_features.device)
-    std = torch.zeros(num_classes, feature_dim, dtype=train_features.dtype, device=train_features.device)
-    for class_id in range(num_classes):
-        class_features = train_features[train_labels == class_id]
-        if len(class_features) > 0:
-            mean[class_id] = class_features.mean(dim=0)
-            std[class_id] = class_features.std(dim=0)
+    for _, _, labels, file_paths in progress:
+        label = labels[0]
+        file_path = file_paths[0]
+        image_id = file_path.split("/")[-1].replace(".JPG", ".txt")
+        gt_mask = masks[image_id]["gt_mask"]
+        sam_mask = masks[image_id]["sam_mask"]
+
+        intersection = np.logical_and(gt_mask, sam_mask).sum()
+        union = np.logical_or(gt_mask, sam_mask).sum()
+
+        if class_aware_iou.get(label) is None:
+            class_aware_iou[label] = {"intersection": 0, "union": 0}
+
+        class_aware_iou[label]["intersection"] += intersection
+        class_aware_iou[label]["union"] += union
+
+    macro_iou = 0
+
+    for label, metrics in class_aware_iou.items():
+        iou = metrics["intersection"] / metrics["union"] if metrics["union"] > 0 else 0
+        class_aware_iou[label]["iou"] = iou
+        macro_iou += iou
     
-    accuracies_per_class = {}
-
-    for class_id in range(num_classes):
-        if(test_labels == class_id).sum().item() == 0:
-            # print(f"Class {class_id}: No samples in test set, skipping.")
-            continue
-        class_features = test_features[test_labels == class_id]
-        dist_euc = torch.cdist(class_features, mean, p=2)
-        min_dist_euc = dist_euc.argmin(dim=1)
-        acc_euc = (min_dist_euc == class_id).float().mean().item()
-        # print(f"Class {class_id}: Euclidean Accuracy = {acc_euc:.4f}")
-
-        accuracies_per_class[class_id] = {
-            'euclidean': acc_euc
-        }
-
-    overall_acc_euc = (torch.cdist(test_features, mean, p=2).argmin(dim=1) == test_labels).float().mean().item()
-    mAcc_euc = np.mean([v['euclidean'] for v in accuracies_per_class.values()])
-
-    return overall_acc_euc, mAcc_euc
-
-
-def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name = "", sam_masks={}, save_csv=True):
-    results = []
-
-    # Prepare data with current samples_per_class
-    train_data = load_shards(ROOT / MODEL_TRAIN)
-    test_data = load_shards(ROOT / MODEL_TEST)
-
-    for seed in tqdm(seeds, desc="Seeds", position=0):
-        seed_everything(seed)
-        csv_path = f'./results/{experiment_name}/{seed}.csv'
-
-        for samples_per_class in tqdm(
-            range(min_samples, max_samples + 1),
-            desc=f"Samples seed={seed}",
-            position=1,
-            leave=False,
-        ):
-
-            train_data_balanced = balance_data(train_data, seed=seed, samples_per_class=samples_per_class)
-            test_data_balanced = balance_data(test_data, seed=seed, samples_per_class=samples_per_class)
-
-            train_labels, test_labels = remap_labels(train_data_balanced['labels'], test_data_balanced['labels'])
-            train_data_balanced['labels'] = train_labels
-            test_data_balanced['labels'] = test_labels
-
-            # Run prototype method
-            global_acc_euc, mAcc  = prototype_method(train_data_balanced, test_data_balanced, sam_masks=sam_masks)
-
-            result = {
-                'samples_per_class': samples_per_class,
-                'accuracy_euclidean': mAcc,
-                'accuracy_euclidean_overall': global_acc_euc,
-            }
-            results.append(result)
-            # Save intermediate results
-            os.makedirs("/".join(csv_path.split("/")[:-1]), exist_ok=True)
-            if save_csv:
-                with open(csv_path, 'w', newline='') as f:
-                    writer = csv.DictWriter(f, fieldnames=result.keys())
-                    writer.writeheader()
-                    writer.writerows(results)
-        
-        plot_sweep(results, save_path=f"{csv_path.replace("csv", "png")}", save_only=True)
-
-    return results
-
-def plot_sweep(results, save_path="sweep_samples_per_class_plot.png", save_only=False):
-    x = [r['samples_per_class'] for r in results]
-    plt.figure(figsize=(10, 7))
-    plt.plot(x, [r['accuracy_euclidean'] for r in results], label='Euclidean')
-    plt.xlabel('Samples per Class')
-    plt.ylabel('Accuracy')
-    plt.title('Accuracy vs Samples per Class')
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(f'{save_path}', dpi=300)
-    if not save_only:
-        plt.show()
-    plt.close()
+    macro_iou /= len(class_aware_iou)
+    return macro_iou, class_aware_iou
 
 if __name__ == "__main__":
 
@@ -143,4 +114,10 @@ if __name__ == "__main__":
     sam_masks_general = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed/sam3_yolo_generic_mushroom_200/all/test/720/FungiTastic/test/720p"))
     sam_masks_specific = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed/sam3_yolo_specific_mushroom_200/all/test/720/FungiTastic/test/720p"))
 
-    results = run_sweep(1, max_samples, seeds=num_seeds, experiment_name=experiment_name, sam_masks=sam_masks, save_csv=True)
+    computed_iou_general, _ = compute_metric(sam_masks_general)
+    print(f"Macro IoU - GENERAL: {computed_iou_general:.4f}")
+    
+    computed_iou_specific, _ = compute_metric(sam_masks_specific)
+    print(f"Macro IoU - SPECIFIC: {computed_iou_general:.4f}")
+
+
