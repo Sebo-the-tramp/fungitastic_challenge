@@ -1,16 +1,1 @@
-\section{Discussion}
-
-\paragraph{What the completed evidence already supports.}
-Even after broadening the paper, the current DINOv3 slice still says something concrete. Segmentation helps most when it refines local evidence without replacing the global representation. Both the MLP results and the 224 $k$-NN sweep prefer \texttt{cls+masked} over \texttt{patch}, and neither supports a patch-only summary as a strong default.
-
-\paragraph{Why the README-level paper still needs more runs.}
-The broader manuscript asks questions about segmentation regimes, backbone families, and classifier choice. The current evidence covers only one backbone and an incomplete classifier set. It is therefore strong enough to justify the local claim that mask-aware fusion helps in the current DINOv3 setting, but it is not strong enough to rank CLIP against DINOv3, to compare oracle masks against SAM-3 at scale, or to state whether MLP, prototype, and linear probe will preserve the same ordering.
-
-\paragraph{Why the fusion ablation matters.}
-The new multi-backbone block is important because it can change the final design recommendation. If a diverse pair such as \texttt{DINO+SigLIP} already captures most of the ensemble gain, then the practical lesson is that complementary inductive biases matter more than simply accumulating more frozen encoders. If, instead, gains continue to rise with several added models, then quantity would matter more than expected. The paper should make that distinction explicit.
-
-\paragraph{Why keeping both teaser slots still helps.}
-Teaser~A is now a real exported figure, and that already improves the paper because the top-line oracle-mask trend is visible at a glance. Teaser~B should still remain in place as an explicit slot for the 2000-class SAM-3 result, because it preserves the intended story structure and avoids rewriting the manuscript around a narrow first slice that will later become only one subsection.
-
-\paragraph{Immediate next steps.}
-The remaining work is now clearly staged: export the 2000-class SAM-3 teaser, run the cross-family backbone sweep, finish the prototype and linear-probe baselines, and extend the classifier comparison beyond the current 224 $k$-NN slice. After that, stratified analysis by class frequency, mask area, and hard species pairs can explain where the segmentation gains actually come from.
+% \section{Discussion}

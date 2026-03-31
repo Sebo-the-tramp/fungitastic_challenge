@@ -4,31 +4,69 @@
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{media/Figure1-observation.png}
-    \caption{FungiTastic observations combine images, expert-verified labels, and segmentation masks for a subset of the data \cite{picek2024fungitastic}. The paper studies how these masks interact with frozen visual features and lightweight classifiers.}
+    \caption{FungiTastic observations combine images, expert-verified labels, and segmentation masks for a subset of the data, image from \cite{Picek_2025_CVPR}.}
     \label{fig:fungitastic}
 \end{figure}
 
-\paragraph{Dataset and evaluation scopes.}
-The README-level paper is organized around two scopes: a 200-class oracle-mask teaser and a 2000-class SAM-3 teaser. The currently completed closed-set slice in the repo uses extracted features for 215 classes. According to the saved run metadata, this slice contains 22,445 train/validation samples and 9,763 test samples. For the MLP runs, the stored \texttt{train} and \texttt{val} folders are merged and re-split into 19,077 training and 3,368 validation samples for early stopping. For $k$-NN, the full 22,445-sample train/validation pool is used as the retrieval bank.
+\paragraph{Dataset and evaluation protocol.}
+We evaluate our approach on the FungiTastic dataset \cite{Picek_2025_CVPR}, a fine-grained benchmark characterized by subtle inter-class differences and a highly imbalanced, long-tailed distribution. The dataset contains approximately 13k images with segmentation annotations (Fig.~\ref{fig:fungitastic}). 
 
-\paragraph{Segmentation conditions.}
-The paper structure in the README distinguishes three segmentation regimes: no segmentation, oracle segmentation, and SAM-3 segmentation. In descriptor terms, this corresponds to global image tokens, whole-image pooled patch tokens, and mask-aware pooled patch tokens where the pooling weights come from either ground-truth masks or predicted masks. The README also calls out register-token features as an additional descriptor to test alongside whole-image and masked pooling.
+To ensure consistent evaluation, we restrict the label space to 194 classes present in both training and test splits. We report results in one-shot, few-shot, and full-data regimes. Unless otherwise stated, evaluation is performed on the full test set without rebalancing.
 
-\paragraph{Backbone families.}
-The top-line teaser plots are defined over the DINOv3 suite. The broader backbone ablation requested in the README spans CLIP, SigLIP, MAE, DINOv1, DINOv2, DINOv3, and InternViT. At the current repo state, the completed runs populate only the DINOv3 ViT-7B slice.
+\paragraph{Segmentation setup.}
+We use SAM3 to extract object masks. For prompt-based baselines, we evaluate both coarse and fine-grained textual prompts, applying thresholds of 0.5 and 0.3 respectively. 
 
-\paragraph{Multi-backbone fusion.}
-The draft now reserves a dedicated block for testing whether diversity matters more than quantity when several frozen backbones are combined. For backbone $m$, let $x_m$ denote the descriptor and let $W_m x_m \in \mathbb{R}^d$ be its learned projection into a shared space. A lightweight gate predicts a scalar or branch weight $\alpha_m$, and the fused representation is
+Prompt-based SAM requires one forward pass per class and image, resulting in segmentation cost that grows linearly with the number of classes. In contrast, our method performs a single class-agnostic SAM pass per image and assigns labels in a separate stage, making segmentation cost constant with respect to the label space (Fig.~X).
+
+\paragraph{Backbone models.}
+Our primary backbone is DINOv3 \cite{simeoni2025dinov3}, used as a frozen feature extractor. We additionally evaluate DINOv2 \cite{oquab2023dinov2}, CLIP \cite{radford2021learningtransferablevisualmodels}, \SCc{and masked autoencoder variants to assess the impact of representation quality.}
+
+\paragraph{Classification.}
+We extract global image representations from frozen backbones and train lightweight classifiers on top. Unless otherwise stated, we use the \texttt{[CLS]} token as the feature representation. We also explore alternative representations, including register tokens and mean-pooled patch embeddings.
+
+\paragraph{Segment-based augmentations.}
+Leveraging the available segmentation masks, we construct augmented views by modifying the background while preserving the foreground object. Specifically, we (i) mask the background and (ii) apply background blurring. These augmentations are used to enrich feature representations in low-data regimes.
+
+\paragraph{Metrics.}
+We report top-1 and top-5 classification accuracy, as well as mean IoU for segmentation. Additionally, we introduce classification-aware IoU (CaIoU), defined as:
 \[
-z = \sum_{m=1}^{M} \alpha_m W_m x_m .
+\mathrm{CaIoU} = \mathrm{IoU}(\hat{M}, M) \cdot \mathbf{1}[\hat{y} = y],
 \]
-This is the minimal version of the user-facing idea ``project everything to the same space and gate it with $\alpha$''. The corresponding ablation should compare single backbones, diverse pairs such as \texttt{DINO+SigLIP}, larger mixtures, and the full ensemble to test whether diverse combinations saturate most of the gain.
+which measures segmentation quality conditioned on correct classification.
 
-\paragraph{Classifier families.}
-The classifier ablation requested in the README includes prototype, $k$-NN, linear probe, and MLP. The completed evidence currently covers MLP runs at 224 and 448, plus a 224 $k$-NN sweep. Prototype and linear-probe tables are still pending.
+% \section{Experimental Setup}
+% \label{sec:setup}
 
-\paragraph{Completed DINOv3 feature variants.}
-Within the completed DINOv3 slice, the current paper writes up the descriptors that already exist in the repo: \texttt{cls}, \texttt{patch}, \texttt{masked}, \texttt{cls+patch}, \texttt{cls+masked}, and exploratory 224-only \texttt{register} and \texttt{cls+register} rows from the latest rerun. These variants directly implement the README idea of comparing whole-image, segmented, and register-style descriptors.
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=\linewidth]{media/Figure1-observation.png}
+%     \caption{FungiTastic observations combine images, expert-verified labels, and segmentation masks for a subset of the data \cite{picek2024fungitastic}. The paper studies how these masks interact with frozen visual features and lightweight classifiers.}
+%     \label{fig:fungitastic}
+% \end{figure}
 
-\paragraph{Metric.}
-The dashboard tracks top-1 accuracy, so that is the metric reported here. Stratified analyses by class frequency, mask area, and hard species pairs remain part of the planned follow-up rather than the completed draft.
+
+% \paragraph{Dataset and evaluation scopes.}
+% In this work we use the fungitastic dataset \cite{} as a good proxy of a presumably out of distribution dataset that requires very discriminative features to classify. There are 13k images in the segmented dataset as show in figure \ref{fig:dataset}. A second observation is that the distribution of classes count is extremely skewed showing a long-tailed phenomenon. Given this observation we decide to restrict the scope of the research to one and few-shot. We also show results for the full dataset. In particular we also restrict the number of classes to 194 which are the ones that are present in both train and test. We have not included the validation set in our training data as done by others previously on the classification challenge to further boost performances.
+% todo{The evaluation is performed on a balanced subset of the test set (?) or on all the test set (?)}
+
+% \paragraph{Segmentation conditions.}
+% To segment the instances of the mushrooms we leverage SAM3. As explained earlier we both prompt and evaluate the segmentation prompting SAM both with a coarse and a specific query. \SCc{We use the outputs as is, providing a probability threshold of 0.5 for coarse and 0.3 on the specific.}
+
+% Prompt-based SAM requires one forward pass per candidate class for each image, resulting in segmentation cost that grows linearly with the number of classes. In contrast, our approach performs a single class-agnostic SAM pass per image and assigns semantic labels in a separate stage. As a result, the segmentation cost is constant with respect to the number of classes.
+% We visualize this behavior in Fig.~X, where prompt-based SAM scales linearly with the label space, while our method remains constant.
+
+% \paragraph{Backbone families.}
+% The main backbone used in this experiment is DINOv3 \cite{}. We also provide preliminary results on adiacent backbones such as DINOv2 \cite{}, CLIP \cite{} and some masked autoencoders.
+
+% \paragraph{Classification.}
+% We use the frozen backbones detailed above. We extract the `CLS\_TOKEN` from the output of the feature extractor and use the latent vector as inputs for the classification task. \SCc{We also experiment with different available vecotrs from DINOv3, such as register or mean-pool over the patches}
+
+% \paragraph{Augmentations.}
+% Given the early availability of segmentations, we perform additional inference on the frozen backbones, by masking the mushroom and i) black out the background ii) blur out the background. We thus use this "augmentations" to extend the prototypes and achieve higher performance.
+
+% \paragraph{Metric.}
+% We report both top-1 and top-5 accuracy for the classification as well as mean IoU over the segments. We further propose a classification aware IoU, \textbf{CaIoU} that keeps into account the classification correctness of the pixel as defined as: 
+
+% \[
+% \mathrm{CaIoU} = \mathrm{IoU}(\hat{M}, M) \cdot \mathbf{1}[\hat{y} = y]
+% \]
