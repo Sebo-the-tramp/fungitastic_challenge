@@ -40,7 +40,6 @@ PCA_WHITE_PREFIX = "prototype_pca_white_"
 PCA_WHITE_KEEP = "prototype_pca_white_512"
 REFERENCE_LINES = {
     "mIoU": [
-        ("GENERAL (oracle class)", 0.8937, "#4c566a"),
         ("SPECIFIC (oracle class)", 0.5522, "#8f5e3c"),
     ],
 }
