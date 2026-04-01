@@ -1,4 +1,4 @@
-\section{Experimental Setup}
+\section{Method and Experimental Setup}
 \label{sec:setup}
 
 \begin{figure}[t]
@@ -8,24 +8,26 @@
     \label{fig:fungitastic}
 \end{figure}
 
-\paragraph{Dataset and evaluation protocol.}
-We evaluate our approach on the FungiTastic dataset \cite{Picek_2025_CVPR}, a fine-grained benchmark characterized by subtle inter-class differences and a highly imbalanced, long-tailed distribution. The dataset contains approximately 13k images with segmentation annotations (Fig.~\ref{fig:fungitastic}) spanning over 200 differen classes.
+\subsection{Dataset}
+We evaluate our approach in the FungiTastic dataset \cite{Picek_2025_CVPR}, a fine-grained benchmark characterized by subtle differences between classes and a highly imbalanced, long-tailed distribution. We consider only the portion of the dataset comprising segmentation masks. The subset contains approximately 13k images with segmentation annotations (Fig.~\ref{fig:fungitastic}) spanning over 200 different classes. 
 
-To ensure consistent evaluation, we restrict the label space to 194 classes present in both training and test splits. We report results in one-shot, few-shot, and full-data regimes. Unless otherwise stated, evaluation is performed on the full test set without rebalancing.
+To ensure consistent evaluation, we restrict the label space to 194 classes present in both training and test splits. We report results in one-shot, few-shot, and low data regimes. Unless otherwise stated, the evaluation is performed on the full test set without rebalancing.
 
-\paragraph{Segmentation setup.}
-We use SAM3 to extract object masks. For prompt-based baselines, we evaluate both coarse and fine-grained textual prompts, applying thresholds of 0.5 and 0.3 respectively. 
+\subsection{Evaluation Protocol}
 
-Prompt-based SAM requires one forward pass per class and image, resulting in segmentation cost that grows linearly with the number of classes. In contrast, our method performs a single class-agnostic SAM pass per image and assigns labels in a separate stage, making segmentation cost constant with respect to the label space (Fig.~X).
+\paragraph{General Baseline + Oracle.} We prompt SAM3 with the string "mushrooms" which constitutes our macro taxonomic prompt and retain the output by threholding at 0.5. This constitutes the general ability of the model to segment all kind of mushrooms with class agnostic knowledge. We then assume an oracle classification of pixels in order to compute the macro taxonomic upper bound (i.e. how good is SAM3 at segmenting mushrooms).
 
-\paragraph{Backbone models.}
-Our primary backbone is DINOv3 \cite{simeoni2025dinov3}, used as a frozen feature extractor. We additionally evaluate DINOv2 \cite{oquab2023dinov2}, CLIP \cite{radford2021learningtransferablevisualmodels}, \SCc{and masked autoencoder variants to assess the impact of representation quality.}
+\paragraph{Fine-Grained Baseline + Oracle.} To produce fine-grained SAM segmentations we cannot assume a priori knowledge; therefore, we would need to forward each test image 194 times (i.e., one for each class). This results in a segmentation cost that grows linearly with the number of classes. To this end, we assume that an oracle provides exact taxonomic scientific names, and we use these as prompts for SAM3. We then retain the output by thresholding at 0.3. This baseline is useful to investigate the abilities of SAM3 when prompted with exact classes (ex. ``boletus edulis" or ``psilocybe cubensis"). This also acts as our upper bound. 
 
-\paragraph{Classification.}
-We extract global image representations from frozen backbones and train lightweight classifiers on top. Unless otherwise stated, we use the \texttt{[CLS]} token as the feature representation. We also explore alternative representations, including register tokens and mean-pooled patch embeddings.
+\paragraph{Our Method} Our baseline proposal starts from macro taxonomic segmentations and aim to assign class labels in a separate stage through training-free prototype based algorithm. Our primary backbone is DINOv3 \cite{simeoni2025dinov3}, used as a frozen feature extractor. Unless otherwise stated, we use the \texttt{[CLS]} token as the feature representation for DINOv3. Here, segmentation costs are constant with respect to the label space.
 
-\paragraph{Segment-based augmentations.}
-Leveraging the available segmentation masks, we construct augmented views by modifying the background while preserving the foreground object. Specifically, we (i) mask the background and (ii) apply background blurring. These augmentations are used to enrich feature representations in low-data regimes.
+
+ %We additionally evaluate DINOv2 \cite{oquab2023dinov2}, CLIP \cite{radford2021learningtransferablevisualmodels}, \SCc{and masked autoencoder variants to assess the impact of representation quality.}
+ 
+% We also explore alternative representations, including register tokens and mean-pooled patch embeddings.
+
+%\paragraph{Segment-based augmentations.}
+%Leveraging the available segmentation masks, we construct augmented views by modifying the background while preserving the foreground object. Specifically, we (i) mask the background and (ii) apply background blurring. These augmentations are used to enrich feature representations in low-data regimes.
 
 \paragraph{Metrics.}
 We report top-1 and top-5 classification accuracy, as well as mean IoU for segmentation. Additionally, we introduce classification-aware IoU (CaIoU), defined as:
