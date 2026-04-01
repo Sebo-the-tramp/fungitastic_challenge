@@ -4,7 +4,6 @@ from pathlib import Path
 from rich.table import Table
 from rich.console import Console
 import torch
-import torch.nn.functional as F
 import os
 import csv
 import random
@@ -75,6 +74,17 @@ def build_mask_cache(
     )
 
 
+def normalize_features(
+    train_features: torch.Tensor,
+    test_features: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    train_features = train_features.float()
+    test_features = test_features.float()
+    train_mean = train_features.mean(dim=0, keepdim=True)
+    train_std = train_features.std(dim=0, keepdim=True, unbiased=False).clamp_min(1e-6)
+    return (train_features - train_mean) / train_std, (test_features - train_mean) / train_std
+
+
 @torch.no_grad()
 def prototype_method(
     train_features: torch.Tensor,
@@ -134,10 +144,9 @@ def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name="", mas
     test_class_indices = build_class_indices(test_labels, num_classes)
     test_file_names_all, total_pixels_all, pixel_in_all, pixel_out_all = build_mask_cache(test_data["file_paths"], masks)
 
-    train_features_all = F.normalize(train_data["cls_tokens"].to(DEVICE), p=2, dim=1)
+    train_features_all = train_data["cls_tokens"].to(DEVICE)
     train_labels_all = train_labels.to(DEVICE)
-    test_features_all = F.normalize(test_data["cls_tokens"].to(DEVICE), p=2, dim=1)
-    test_feature_norms_all = test_features_all.square().sum(dim=1)
+    test_features_all = test_data["cls_tokens"].to(DEVICE)
 
     for seed in tqdm(seeds, desc="Seeds", position=0):
         seed_everything(seed)
@@ -164,12 +173,16 @@ def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name="", mas
             test_indices = sample_balanced_indices(test_class_indices, seed=seed, samples_per_class=samples_per_class)
             train_indices_device = train_indices.to(DEVICE)
             test_indices_device = test_indices.to(DEVICE)
+            train_features, test_features = normalize_features(
+                train_features_all[train_indices_device],
+                test_features_all[test_indices_device],
+            )
 
             raw_data, metrics_data = prototype_method(
-                train_features=train_features_all[train_indices_device],
+                train_features=train_features,
                 train_labels=train_labels_all[train_indices_device],
-                test_features=test_features_all[test_indices_device],
-                test_feature_norms=test_feature_norms_all[test_indices_device],
+                test_features=test_features,
+                test_feature_norms=test_features.square().sum(dim=1),
                 test_labels=test_labels[test_indices],
                 test_file_names=[test_file_names_all[i] for i in test_indices.tolist()],
                 total_pixels=total_pixels_all[test_indices],
@@ -231,9 +244,9 @@ def plot_sweep(results, save_path="sweep_samples_per_class_plot.png", metric="ac
 if __name__ == "__main__":
 
     max_samples = 200
-    # num_seeds = [7, 42, 123, 2024, 9999]
-    np.random.seed(42)
-    num_seeds = list(map(int, np.random.randint(0, 10000, size=20)))
+    num_seeds = [7, 42, 123, 2024, 9999][:1]
+    # np.random.seed(42)
+    # num_seeds = list(map(int, np.random.randint(0, 10000, size=20)))
     experiment_name = "prototype_normalized"
 
     masks = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed/sam3_yolo_generic_mushroom_200/all/test/720/FungiTastic/test/720p"))

@@ -130,9 +130,18 @@ def pca_project_features(
     train_mean = train_features.mean(dim=0, keepdim=True)
     train_centered = train_features - train_mean
     test_centered = test_features - train_mean
-    _, _, basis = torch.pca_lowrank(train_centered, q=pca_dim, center=False)
-    train_features = train_centered @ basis[:, :pca_dim]
-    test_features = test_centered @ basis[:, :pca_dim]
+
+    # Original
+    # _, _, basis = torch.pca_lowrank(train_centered, q=pca_dim, center=False)
+    # train_features = train_centered @ basis[:, :pca_dim]
+    # test_features = test_centered @ basis[:, :pca_dim]
+
+    # SCALED
+    _, singular_values, basis = torch.pca_lowrank(train_centered, q=pca_dim, center=False)
+    scale = singular_values[:pca_dim] / (train_features.shape[0] - 1) ** 0.5
+    train_features = train_centered @ basis[:, :pca_dim] / scale
+    test_features = test_centered @ basis[:, :pca_dim] / scale
+
     return train_features, test_features
 
 
@@ -276,11 +285,11 @@ def plot_sweep(results, save_path="sweep_samples_per_class_plot.png", metric="ac
 if __name__ == "__main__":
 
     max_samples = 200
-    pca_dim=512
-    # num_seeds = [7, 42, 123, 2024, 9999]
-    np.random.seed(42)
-    num_seeds = list(map(int, np.random.randint(0, 10000, size=20)))
-    print(num_seeds)
+    pca_dim=256
+    num_seeds = [7, 42, 123, 2024, 9999][:1]
+    # np.random.seed(42)
+    # num_seeds = list(map(int, np.random.randint(0, 10000, size=20)))
+    # print(num_seeds)
     experiment_name = f"prototype_pca_{pca_dim}"
 
     masks = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed/sam3_yolo_generic_mushroom_200/all/test/720/FungiTastic/test/720p"))

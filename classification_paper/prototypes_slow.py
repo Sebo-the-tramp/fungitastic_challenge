@@ -63,26 +63,7 @@ def prototype_method(train_data: dict[str, torch.Tensor | None],
             'pred_class': pred_class
         })
 
-    # overall_acc_euc = (torch.cdist(test_features, prototypes, p=2).argmin(dim=1) == test_labels).float().mean().item()
-    # class_accuracies = [
-    #     (torch.cdist(test_features[test_labels == class_id], prototypes, p=2).argmin(dim=1) == class_id).float().mean().item() 
-    #     for class_id in range(num_classes)
-    #     if (test_labels == class_id).any()  # This is the "Gatekeeper"
-    # ]
-    # mAcc_euc = np.mean(class_accuracies) if class_accuracies else 0.0
-
-    # print(f"Overall Accuracy (Euclidean): {overall_acc_euc:.4f}")
-    # print(f"Mean Accuracy (Euclidean): {mAcc_euc:.4f}")
-
-    # print(f"+++++++++++++++++++++++++++++")
-
-    # metrics = compute_metrics_final(data_raw, num_classes=num_classes)
-
-    # for metric_name, metric_value in metrics.items():
-    #     print(f"{metric_name}: {metric_value:.4f}")
-
     return data_raw
-
 
 def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name = "", masks={}, save_csv=True):
 
@@ -117,9 +98,10 @@ def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name = "", m
             metrics = compute_metrics_final(raw_data, num_classes=train_labels.max().item() + 1)
             
             result_computed = {
-                'samples_per_class': samples_per_class,
-                'accuracy_euclidean': metrics["macro_img_acc"],
-                'accuracy_euclidean_overall': metrics["overall_img_acc"]
+                "samples_per_class": samples_per_class,
+                "accuracy_euclidean": metrics["macro_img_acc"],
+                "accuracy_euclidean_overall": metrics["overall_img_acc"],
+                "mIoU": metrics["mIoU"],
             }
             results_computed.append(result_computed)
 
@@ -144,26 +126,11 @@ def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name = "", m
                     if f.tell() == 0:  # Check if file is empty to write header
                         writer.writeheader()
                     writer.writerow(result_computed)
-
-
-
-                # with open(csv_path_computed, 'w', newline='') as f:
-                #     writer = csv.DictWriter(f, fieldnames=result_computed.keys())
-                #     writer.writeheader()
-                #     writer.writerows(results_computed)
-
-                # csv_path_raw = f"{csv_path_prefix}_raw.csv"
-                # with open(csv_path_raw, 'w', newline='') as f:
-                #     writer = csv.DictWriter(f, fieldnames=results_raw[0][0].keys())
-                #     writer.writeheader()
-                #     for batch in results_raw[-1]:
-                #         for line in batch:
-                #             writer.writerows(line)
         
         csv_path_plot = f"{csv_path_prefix}_plot.png"
         plot_sweep(results_computed, save_path=f"{csv_path_plot}", save_only=True)
 
-    return results
+    return results_raw
 
 def plot_sweep(results, save_path="sweep_samples_per_class_plot.png", save_only=False):
     x = [r['samples_per_class'] for r in results]
@@ -183,8 +150,8 @@ def plot_sweep(results, save_path="sweep_samples_per_class_plot.png", save_only=
 if __name__ == "__main__":
 
     max_samples = 100
-    num_seeds = [7, 42, 123, 2024, 9999]
-    experiment_name = "prototype"
+    num_seeds = [7, 42, 123, 2024, 9999][:1]
+    experiment_name = "prototypes_slow"
 
     masks = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed/sam3_yolo_generic_mushroom_200/all/test/720/FungiTastic/test/720p"))
     results = run_sweep(1, max_samples, seeds=num_seeds, experiment_name=experiment_name, masks=masks, save_csv=True)

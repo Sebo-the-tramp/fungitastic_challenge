@@ -38,10 +38,11 @@ SPECIAL_STYLES = {
 }
 PCA_WHITE_PREFIX = "prototype_pca_white_"
 PCA_WHITE_KEEP = "prototype_pca_white_512"
+EXCLUDED_FOLDERS = [
+    "prototypes_slow",
+]
 REFERENCE_LINES = {
-    "mIoU": [
-        ("SPECIFIC (oracle class)", 0.5522, "#8f5e3c"),
-    ],
+    "mIoU": [],
 }
 PLOTS = [
     ("mIoU", "plot_miou_runs.png", "mIoU (%)", "mIoU across runs"),
@@ -59,6 +60,13 @@ def computed_csv_paths(folder: Path) -> list[Path]:
     paths = sorted(folder.glob("*_computed.csv"), key=lambda path: int(path.stem.split("_", 1)[0]))
     assert paths, f"Missing *_computed.csv in {folder}"
     return paths
+
+
+def metric_available(folder: Path, metric: str) -> bool:
+    with computed_csv_paths(folder)[0].open(newline="") as handle:
+        fieldnames = csv.DictReader(handle).fieldnames
+    assert fieldnames is not None, f"Missing header in computed csv under {folder}"
+    return metric in fieldnames
 
 
 def load_run(csv_path: Path, metric: str) -> dict[int, float]:
@@ -85,6 +93,7 @@ def result_folders() -> list[Path]:
         folder
         for folder in sorted(RESULTS_DIR.iterdir())
         if folder.is_dir()
+        and folder.name not in EXCLUDED_FOLDERS
         and list(folder.glob("*_computed.csv"))
         and (not folder.name.startswith(PCA_WHITE_PREFIX) or folder.name == PCA_WHITE_KEEP)
     ]
@@ -179,7 +188,9 @@ def plot_metric_panel(
     title: str,
     show_legend: bool,
 ) -> None:
-    for folder in folders:
+    metric_folders = [folder for folder in folders if metric_available(folder, metric)]
+    assert metric_folders, f"No result folders with metric {metric} in {RESULTS_DIR}"
+    for folder in metric_folders:
         x, mean, std, num_runs = aggregate_folder(folder, metric)
         style = styles[folder.name]
         color = style["color"]
