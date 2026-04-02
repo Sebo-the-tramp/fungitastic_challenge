@@ -1,22 +1,19 @@
 \section{Introduction}
 
-Fine-grained semantic segmentation requires both precise localization and the ability to distinguish subtle inter-class differences \cite{birdclef, plantclef}. This challenge is particularly pronounced in domains such as mycology, where classes exhibit minimal visual differences and long-tailed distributions. In addition, the FungiTastic \cite{Picek_2022_WACV} dataset presents substantial variability in acquisition conditions, further increasing the difficulty of the task. Together, these factors create a dual challenge: the model must remain highly sensitive to discriminative fine-grained features while also being robust to pronounced intra-class variation.
+Fine-grained semantic segmentation requires both accurate localization and the ability to distinguish subtle visual differences between classes \cite{birdclef, plantclef}. This challenge is particularly severe in mycology, where species often exhibit high visual similarity, strong intra-class variability, and long-tailed distributions. The FungiTastic dataset \cite{Picek_2022_WACV} further increases the difficulty through large variations in acquisition conditions.
 
-At the same time, semantic segmentation in real-world settings is severely constrained by the high cost of dense pixel-level annotation, which often leads to low-data regimes. This limitation is especially critical in fine-grained domains, where collecting sufficiently large and well-curated annotated datasets is particularly difficult. As a result, progress in fine-grained semantic segmentation under low-data conditions remains limited. To the best of our knowledge, no prior work has specifically addressed fine-grained semantic segmentation in low-data regimes.
+In practice, progress in this setting is also limited by the cost of dense pixel-level annotation, which makes fine-grained segmentation especially challenging under low-data regimes. This is a critical issue in specialized domains, where annotated data are scarce and difficult to collect.
 
-In parallel, the recent success of powerful pretrained feature extractors \cite{dinov2, clip, siglip} has paved the way to pipelines that rely on foundation models as off-the-shelf visual backbones. Such approaches are especially appealing because they enable rapid prototyping while leveraging the representational strength of large, well-established models. Within this perspective, parameter-free methods offer a particularly attractive direction, as they reduce training complexity and make adaptation feasible even when annotated data are scarce.
+Recent vision foundation models \cite{dinov2, clip, siglip} provide strong off-the-shelf representations and make low-training or training-free pipelines increasingly attractive. At the same time, SAM3 \cite{carion2025sam3segmentconcepts} has shown strong class-agnostic segmentation capabilities, but its semantic use still depends on class-specific prompting. In fine-grained settings, this is problematic, since the correct class prompt is not known at inference time and exhaustive prompting scales linearly with the number of classes.
 
-Foundation models such as SAM3 \cite{carion2025sam3segmentconcepts} have demonstrated strong class-agnostic segmentation capabilities and can be adapted to semantic segmentation through class-specific prompting. However, this adaptation relies on prior knowledge of the target class, an assumption that rarely holds in practice. At inference time, the appropriate prompt is generally unknown, making the direct application of SAM3 non-trivial, since the model would otherwise need to be queried exhaustively with all plausible classes for each input image.
-
-Motivated by these challenges, we propose a two-stage framework that decouples segmentation from classification. We first extract class-agnostic segments using SAM3 \cite{carion2025sam3segmentconcepts}, and then assign semantic labels by embedding each segment with a vision foundation model, namely DINOv3 \cite{simeoni2025dinov3}. This design removes the need for class-conditioned inference, improving both efficiency and scalability, while naturally aligning with low-data settings. More broadly, our approach follows the recent trend of composing strong pretrained models into unified pipelines, yielding a parameter-free classification strategy built on top of complementary foundation-model representations.
+We address this limitation with a two-stage framework that decouples segmentation from classification. We first obtain class-agnostic mushroom masks with SAM3 using a macro-taxonomic prompt, then assign fine-grained labels by matching DINOv3 \cite{simeoni2025dinov3} features to class prototypes. This removes the need for class-conditioned segmentation at inference time, keeping segmentation cost constant with respect to the label space while remaining suitable for low-data regimes.
 
 \paragraph{Contributions}
 \begin{itemize}
-    \item We propose a simple and scalable two-stage framework that decouples segmentation and classification through segment embeddings extracted using macro-taxonomy queries.
-    \item We show how DINOv3 embeddings can be modified to obtain more than a 10\% out-of-the-box improvement in centroid-matching algorithms.
-    \item We introduce, to the best of our knowledge, the first benchmark for fine-grained semantic segmentation in low-data regimes.
+    \item We propose a simple two-stage framework that decouples segmentation and classification for fine-grained semantic segmentation.
+    \item We show that transformed DINOv3 embeddings significantly improve prototype-based matching.
+    \item We establish a benchmark for fine-grained semantic segmentation in low-data regimes.
 \end{itemize}
-
 
 \begin{table}[t]
 \centering
