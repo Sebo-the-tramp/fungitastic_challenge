@@ -1,15 +1,22 @@
 \section{Results}
 \label{sec:results}
 
-\paragraph{Accuracy} Results shown in Figure~\ref{fig:teaser} (left) shows that standard normalized DINOv3 embeddings without any feature preprocessing achieve a performance \textcolor{red}{$\sim 30\%$} of mAcc, Taking in account feature preprocessing unlocks more than $\sim 20\%$ of improvement.   
+\paragraph{Accuracy} Results shown in Figure~\ref{fig:teaser} (left) shows that standard normalized DINOv3 embeddings without any feature preprocessing achieve a performance $\sim 30\%$ of mAcc, Taking in account feature preprocessing unlocks more than $\sim 20\%$ of improvement raching mAcc $\sim 50\%$.  This peculiar result is discussed in the following paragraph.
 
 \paragraph{Feature Preprocessing} The FungiTastic dataset is characterized by substantial nuisance variability, including changes in background, illumination, zoom, acquisition conditions, and broader domain shift. These factors dominate the geometry of DINOv3 CLS-token embeddings, masking directions that are more informative for fine-grained fungi classification. As shown in \ref{fig:teaser} (right), neither raw-feature normalization in the original $4096$-dimensional space nor vanilla PCA is sufficient to effectively distinguish classes, revealing the mismatch between the intrinsic geometry of the embedding space and the class-discriminative metric required for prototype comparison. The discriminative class structure emerges more clearly after PCA whitening, i.e. after projecting the features onto the principal-component basis and rescaling each retained component by its standard deviation. The resulting decorrelated and variance balanced representation makes cosine similarity less influenced by nuisance class-independent and high-variance directions, allowing lower and medium-variance class-specific components to contribute more effectively to class separation.
 
-\textcolor{red}{Inserire tabella con qualche numero!}
+%\textcolor{red}{Inserire tabella con qualche numero!}
 
 \paragraph{mIoU}
-In the proposed pipeline the final segmentation performance depends on the interplay between the prototype-based classifier and the segmentation masks provided upfront by SAM3 queried with the generic macro-taxonomic class "mushroom".  
-When considering the resulting mIoU performances \ref{fig:teaser} (right \textcolor{red}{finish here with some cleaver comment} 
+In the proposed pipeline, the final segmentation performance depends on the interplay between the prototype-based classifier and the segmentation masks provided upfront by SAM3 queried with the generic macro-taxonomic class "mushroom".  
+When considering the resulting mIoU performances as shown in Figure~\ref{fig:teaser}, we can see that with a subset of 50 images, the benchmark reaches its maximum at mIoU $30\%$. This suggests that a small quantity of images is enough to provide full dataset coverage.  %(right \textcolor{red}{finish here with some cleaver comment} 
+
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.45\textwidth]{paper/media/backbones/plot_accuracy_backbones.png}
+%     \caption{Accuracy of different DINO(v2/v3) variants.}
+%     \label{fig:accuracy_runs}
+% \end{figure}
 
 
 \begin{comment}
