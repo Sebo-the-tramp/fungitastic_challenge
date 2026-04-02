@@ -1,38 +1,42 @@
 \section{Introduction}
 
-Fine-grained semantic segmentation requires both precise localization and the ability to distinguish subtle inter-class differences. This challenge is particularly pronounced in domains such as mycology, where classes exhibit minimal visual differences and long-tailed distributions.
+Fine-grained semantic segmentation requires both precise localization and the ability to distinguish subtle inter-class differences \cite{birdclef, plantclef}. This challenge is particularly pronounced in domains such as mycology, where classes exhibit minimal visual differences and long-tailed distributions. In addition, the FungiTastic \cite{Picek_2022_WACV} dataset presents substantial variability in acquisition conditions, further increasing the difficulty of the task. Together, these factors create a dual challenge: the model must remain highly sensitive to discriminative fine-grained features while also being robust to pronounced intra-class variation.
 
-Foundation models such as SAM3 \cite{carion2025sam3segmentconcepts} have demonstrated strong class-agnostic segmentation capabilities, and can be adapted to semantic segmentation via class-specific prompting. However, as also noted in prior work \cite{carion2025sam3segmentconcepts}, this approach struggles with fine-grained concepts. Since the FungiTastic dataset \cite{Picek_2025_CVPR} provides a small subset of segmented mushrooms, we confirm this limitation by prompting SAM3 with specific scientific names (e.g., Cantharellus cibarius, Boletus edulis) showing that this approach leads to incomplete segmentations and low performance. Even under oracle classification, we observe a mean IoU of only 59\% (Table~\ref{tab:results}). Moreover, this approach scales poorly, as it requires multiple forward passes per image (one for each class, when correct label is not known a priori) resulting in significant computational overhead.
+At the same time, semantic segmentation in real-world settings is severely constrained by the high cost of dense pixel-level annotation, which often leads to low-data regimes. This limitation is especially critical in fine-grained domains, where collecting sufficiently large and well-curated annotated datasets is particularly difficult. As a result, progress in fine-grained semantic segmentation under low-data conditions remains limited. To the best of our knowledge, no prior work has specifically addressed fine-grained semantic segmentation in low-data regimes.
 
-Motivated by these limitations, we propose a two-stage framework that decouples segmentation from classification. We first extract class-agnostic segments using SAM3 \cite{carion2025sam3segmentconcepts}, and then assign semantic labels by embedding each segment through a vision foundation model (DINOv3 \cite{simeoni2025dinov3}). This design eliminates the need for class-conditioned inference, improving both efficiency and scalability, while naturally supporting low-data regimes.
+In parallel, the recent success of powerful pretrained feature extractors \cite{dinov2, clip, siglip} has paved the way to pipelines that rely on foundation models as off-the-shelf visual backbones. Such approaches are especially appealing because they enable rapid prototyping while leveraging the representational strength of large, well-established models. Within this perspective, parameter-free methods offer a particularly attractive direction, as they reduce training complexity and make adaptation feasible even when annotated data are scarce.
 
-Finally, we investigate whether segment-level representations can be leveraged beyond classification, specifically as a source of data augmentation in few-shot settings.
+Foundation models such as SAM3 \cite{carion2025sam3segmentconcepts} have demonstrated strong class-agnostic segmentation capabilities and can be adapted to semantic segmentation through class-specific prompting. However, this adaptation relies on prior knowledge of the target class, an assumption that rarely holds in practice. At inference time, the appropriate prompt is generally unknown, making the direct application of SAM3 non-trivial, since the model would otherwise need to be queried exhaustively with all plausible classes for each input image.
 
-\textbf{Contributions}.
-(i) We empirically validate the limitations of prompt-based SAM3 for fine-grained segmentation, showing poor IoU even under oracle classification and unfavorable scaling with the number of classes.
-(ii) We propose a simple and scalable two-stage framework that decouples segmentation and classification via segment embeddings extracted using macro taxonomy queries.
-(iii) We benchmark multiple backbone models and evaluate segment-based augmentation strategies, providing insights into their effectiveness in low-data regimes.
+Motivated by these challenges, we propose a two-stage framework that decouples segmentation from classification. We first extract class-agnostic segments using SAM3 \cite{carion2025sam3segmentconcepts}, and then assign semantic labels by embedding each segment with a vision foundation model, namely DINOv3 \cite{simeoni2025dinov3}. This design removes the need for class-conditioned inference, improving both efficiency and scalability, while naturally aligning with low-data settings. More broadly, our approach follows the recent trend of composing strong pretrained models into unified pipelines, yielding a parameter-free classification strategy built on top of complementary foundation-model representations.
+
+\paragraph{Contributions}
+\begin{itemize}
+    \item We propose a simple and scalable two-stage framework that decouples segmentation and classification through segment embeddings extracted using macro-taxonomy queries.
+    \item We show how DINOv3 embeddings can be modified to obtain more than a 10\% out-of-the-box improvement in centroid-matching algorithms.
+    \item We introduce, to the best of our knowledge, the first benchmark for fine-grained semantic segmentation in low-data regimes.
+\end{itemize}
+
 
 \begin{table}[t]
 \centering
 \resizebox{\columnwidth}{!}{%
 \begin{tabular}{ccccc}
 \hline
-DA FIXARE & Mean IoU & Non-empty/Total Images \\
+Method & \textcolor{red}{??????} & Non-empty/Total Images \\
 \hline
-% Macro-Taxonomy & train & 0.8737 & 13586 & 13777 \\
-% Macro-Taxonomy & val & 0.8680 & 8527 & 8668 \\
 Macro-Taxonomy & 0.8722 & 9643/9763 \\
+Fine-Grained (Oracle) & 0.5902 & 6341/9763 \\
 
-% Fine-Grained (Oracle) & train & 0.5815 & 8756 & 13777 \\
-% Fine-Grained (Oracle) & val & 0.6009 & 5720 & 8668 \\
-Fine-Grained (Oracle) & 0.5902 (z) & 6341/9763 \\
-
-Fine-Grained (All vs All) & $x < 0.5902$ & 6341/9763 \\
-Fine-Grained (DINO Proto) & $0.87 > (?z) > y \; (!> x)$ & 6341/9763 \\
+%Fine-Grained (All vs All) & $x < 0.5902$ & 6341/9763 \\
 \hline
 \end{tabular}%
 }
-\caption{Different IoU metrics using different prompting strategies on the \textbf{split} test.}
+\caption{Different \textcolor{red}{mIoU o gIoU?}  metrics using different prompting strategies on the test set.}
 \label{tab:results}
 \end{table}
+
+
+
+
+%However, as also noted in the original work \cite{carion2025sam3segmentconcepts}, this approach struggles with fine-grained concepts. Since the FungiTastic dataset \cite{Picek_2025_CVPR} provides a small subset of segmented mushrooms, we observe this limitation by prompting SAM3 with specific scientific names (e.g., Cantharellus cibarius, Boletus edulis) showing that this approach leads to incomplete segmentations and low performance. Even under oracle classification, we observe a mean IoU of only 59\% (Table~\ref{tab:results}). Moreover, this approach scales poorly, as it requires multiple forward passes per image (one for each class, when correct label is not known a priori) resulting in significant computational overhead.
