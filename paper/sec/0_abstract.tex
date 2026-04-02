@@ -6,14 +6,10 @@
 % \todo{Furthermore, we show that we can leverage the segments to perform augmentations on the few-shot examples and combine them to further boost performances! -> IF TRUE}
 
 % The code will be publicly released upon acceptance.
-Fine-grained semantic segmentation is inherently challenging, as it requires both precise localization and the ability to distinguish subtle inter-class differences. This challenge is further amplified by two factors: 1) the highly imbalanced class distribution of the FungiTastic dataset and 2) the highly nuisance variation due to wildly different image acquisition settings. 
+Fine-grained semantic segmentation requires both precise localization and discrimination between visually similar classes. In FungiTastic, this problem is further complicated by a long-tailed distribution and strong variation in image acquisition conditions.
 
-A straightforward solution is to prompt SAM3 with class-specific queries; however, this approach suffers from limited scalability, slow inference, and low IoU due to frequent class omissions. Additionally, its computational cost increases with both the number of images and the number of classes.
+We propose a parameter-free two-stage framework that decouples segmentation from classification. SAM3 first produces class-agnostic mushroom masks using macro-taxonomic prompts, and DINOv3 then assigns fine-grained labels through prototype matching in the embedding space. To improve this stage, we apply a simple transformation of the DINOv3 feature space that improves prototype-based classification.
 
-To address these limitations, we propose a parameter-free two-stage framework that decouples segmentation from classification. In the first stage, SAM3 is employed to generate class-agnostic segmentations through macro taxonomy queries. In the second stage, a foundation model (DINOv3) extracts latent representations for each segment, enabling classification in embedding space. 
-
-We then devise a parameter-free approach which leverages class prototypes coupled with a correction on the intrinsic geometry of the DINOv3 embedding space. This design removes dependence on class-specific prompts (which are not available during inference) improves scalability and unlock lightweight flexibility thanks to the parameter free property.
-
-We then report baseline results across low data regimes spanning from one-shot, few-shot to few hundred images per class. We think it is important to ground the work on real world scenarios where data regime for segmentation is the de-facto standard due to the costly annotation process. To the best of our knowledge we think this work constitutes the first baseline on such problem.
+Compared with class-specific prompting, our approach is more scalable, and keeps segmentation cost low. We report results from one-shot to few-hundred-shot regimes, providing, to the best of our knowledge, the first baseline for fine-grained semantic segmentation in low-data settings.
 
 \end{abstract}
