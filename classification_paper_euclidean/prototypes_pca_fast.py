@@ -4,7 +4,6 @@ from pathlib import Path
 from rich.table import Table
 from rich.console import Console
 import torch
-import torch.nn.functional as F
 import os
 import csv
 import random
@@ -75,17 +74,12 @@ def build_mask_cache(
     )
 
 
-def pairwise_cosine_distance(x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:
-    x1_norm = F.normalize(x1, p=2, dim=-1)
-    x2_norm = F.normalize(x2, p=2, dim=-1)
-    return 1 - torch.mm(x1_norm, x2_norm.transpose(0, 1))
-
-
 @torch.no_grad()
 def prototype_method(
     train_features: torch.Tensor,
     train_labels: torch.Tensor,
     test_features: torch.Tensor,
+    test_feature_norms: torch.Tensor,
     test_labels: torch.Tensor,
     test_file_names: list[str],
     total_pixels: torch.Tensor,
@@ -98,7 +92,8 @@ def prototype_method(
     prototypes.index_add_(0, train_labels, train_features)
     prototypes = prototypes / torch.bincount(train_labels, minlength=num_classes).unsqueeze(1)
 
-    distances = pairwise_cosine_distance(test_features, prototypes)
+    distances = test_feature_norms.unsqueeze(1) + prototypes.square().sum(dim=1).unsqueeze(0)
+    distances = distances - 2 * test_features @ prototypes.T
     pred_class = distances.argmin(dim=1).cpu()
 
     raw_data = []
@@ -137,15 +132,15 @@ def pca_project_features(
     test_centered = test_features - train_mean
 
     # Original
-    _, _, basis = torch.pca_lowrank(train_centered, q=pca_dim, center=False)
-    train_features = train_centered @ basis[:, :pca_dim]
-    test_features = test_centered @ basis[:, :pca_dim]
+    # _, _, basis = torch.pca_lowrank(train_centered, q=pca_dim, center=False)
+    # train_features = train_centered @ basis[:, :pca_dim]
+    # test_features = test_centered @ basis[:, :pca_dim]
 
     # SCALED
-    # _, singular_values, basis = torch.pca_lowrank(train_centered, q=pca_dim, center=False)
-    # scale = singular_values[:pca_dim] / (train_features.shape[0] - 1) ** 0.5
-    # train_features = train_centered @ basis[:, :pca_dim] / scale
-    # test_features = test_centered @ basis[:, :pca_dim] / scale
+    _, singular_values, basis = torch.pca_lowrank(train_centered, q=pca_dim, center=False)
+    scale = singular_values[:pca_dim] / (train_features.shape[0] - 1) ** 0.5
+    train_features = train_centered @ basis[:, :pca_dim] / scale
+    test_features = test_centered @ basis[:, :pca_dim] / scale
 
     return train_features, test_features
 
@@ -168,6 +163,7 @@ def prototype_method_pca(
         train_features=train_features,
         train_labels=train_labels,
         test_features=test_features,
+        test_feature_norms=test_features.square().sum(dim=1),
         test_labels=test_labels,
         test_file_names=test_file_names,
         total_pixels=total_pixels,
@@ -238,8 +234,8 @@ def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name="", mas
 
             result_computed = {
                 "samples_per_class": samples_per_class,
-                "accuracy_cosine": metrics["macro_img_acc"],
-                "accuracy_cosine_overall": metrics["overall_img_acc"],
+                "accuracy_euclidean": metrics["macro_img_acc"],
+                "accuracy_euclidean_overall": metrics["overall_img_acc"],
                 "mIoU": metrics["mIoU"],
                 
             }
@@ -263,17 +259,17 @@ def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name="", mas
             computed_file.close()
             raw_file.close()
 
-        # plot_sweep(seed_results, save_path=f"{csv_path_prefix}_plot_accuracy.png", metric="accuracy_cosine", save_only=True)
+        # plot_sweep(seed_results, save_path=f"{csv_path_prefix}_plot_accuracy.png", metric="accuracy_euclidean", save_only=True)
         # plot_sweep(seed_results, save_path=f"{csv_path_prefix}_plot_miou.png", metric="mIoU", save_only=True)
 
 
     return all_results
 
 
-def plot_sweep(results, save_path="sweep_samples_per_class_plot.png", metric="accuracy_cosine", save_only=False):
+def plot_sweep(results, save_path="sweep_samples_per_class_plot.png", metric="accuracy_euclidean", save_only=False):
     x = [r["samples_per_class"] for r in results]
     plt.figure(figsize=(10, 7))
-    plt.plot(x, [r[metric] for r in results], label="Cosine")
+    plt.plot(x, [r[metric] for r in results], label="Euclidean")
     plt.xlabel("Samples per Class")
     plt.ylabel("Accuracy")
     plt.title("Accuracy vs Samples per Class")
@@ -289,12 +285,12 @@ def plot_sweep(results, save_path="sweep_samples_per_class_plot.png", metric="ac
 if __name__ == "__main__":
 
     max_samples = 200
-    pca_dim=512
-    # num_seeds = [7, 42, 123, 2024, 9999][:1]
-    np.random.seed(42)
-    num_seeds = list(map(int, np.random.randint(0, 10000, size=20)))
-    print(num_seeds)
-    experiment_name = f"prototype_pca_cosine_{pca_dim}"
+    pca_dim=256
+    num_seeds = [7, 42, 123, 2024, 9999][:1]
+    # np.random.seed(42)
+    # num_seeds = list(map(int, np.random.randint(0, 10000, size=20)))
+    # print(num_seeds)
+    experiment_name = f"prototype_pca_{pca_dim}"
 
     masks = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed/sam3_yolo_generic_mushroom_200/all/test/720/FungiTastic/test/720p"))
     results = run_sweep(1, max_samples, seeds=num_seeds, experiment_name=experiment_name, masks=masks, pca_dim=pca_dim, save_csv=True)

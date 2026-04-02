@@ -123,7 +123,7 @@ def prototype_method(
     }
 
 
-def pca_project_features(
+def pca_whiten_features(
     train_features: torch.Tensor,
     test_features: torch.Tensor,
     pca_dim: int
@@ -135,18 +135,10 @@ def pca_project_features(
     train_mean = train_features.mean(dim=0, keepdim=True)
     train_centered = train_features - train_mean
     test_centered = test_features - train_mean
-
-    # Original
-    _, _, basis = torch.pca_lowrank(train_centered, q=pca_dim, center=False)
-    train_features = train_centered @ basis[:, :pca_dim]
-    test_features = test_centered @ basis[:, :pca_dim]
-
-    # SCALED
-    # _, singular_values, basis = torch.pca_lowrank(train_centered, q=pca_dim, center=False)
-    # scale = singular_values[:pca_dim] / (train_features.shape[0] - 1) ** 0.5
-    # train_features = train_centered @ basis[:, :pca_dim] / scale
-    # test_features = test_centered @ basis[:, :pca_dim] / scale
-
+    _, singular_values, basis = torch.pca_lowrank(train_centered, q=pca_dim, center=False)
+    scale = singular_values[:pca_dim] / (train_features.shape[0] - 1) ** 0.5
+    train_features = train_centered @ basis[:, :pca_dim] / scale
+    test_features = test_centered @ basis[:, :pca_dim] / scale
     return train_features, test_features
 
 
@@ -163,7 +155,7 @@ def prototype_method_pca(
     num_classes: int,
     pca_dim: int
 ) -> tuple[list[dict[str, int | str]], dict[str, torch.Tensor]]:
-    train_features, test_features = pca_project_features(train_features, test_features, pca_dim=pca_dim)
+    train_features, test_features = pca_whiten_features(train_features, test_features, pca_dim=pca_dim)
     return prototype_method(
         train_features=train_features,
         train_labels=train_labels,
@@ -192,9 +184,11 @@ def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name="", mas
     test_class_indices = build_class_indices(test_labels, num_classes)
     test_file_names_all, total_pixels_all, pixel_in_all, pixel_out_all = build_mask_cache(test_data["file_paths"], masks)
 
-    train_features_all = train_data["cls_tokens"].to(DEVICE)
+    print(train_data["register_tokens"].shape)
+
+    train_features_all = torch.cat((train_data["cls_tokens"], train_data["register_tokens"][:,3,:]), dim=1).to(DEVICE)
     train_labels_all = train_labels.to(DEVICE)
-    test_features_all = test_data["cls_tokens"].to(DEVICE)
+    test_features_all = torch.cat((test_data["cls_tokens"], test_data["register_tokens"][:,3,:]), dim=1).to(DEVICE)
 
     for seed in tqdm(seeds, desc="Seeds", position=0):
         seed_everything(seed)
@@ -289,12 +283,12 @@ def plot_sweep(results, save_path="sweep_samples_per_class_plot.png", metric="ac
 if __name__ == "__main__":
 
     max_samples = 200
-    pca_dim=512
+    pca_dim=int(os.getenv("DIM", 512))
     # num_seeds = [7, 42, 123, 2024, 9999][:1]
     np.random.seed(42)
     num_seeds = list(map(int, np.random.randint(0, 10000, size=20)))
     print(num_seeds)
-    experiment_name = f"prototype_pca_cosine_{pca_dim}"
+    experiment_name = f"prototype_pca_white_cosine_reg_{pca_dim}"
 
     masks = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed/sam3_yolo_generic_mushroom_200/all/test/720/FungiTastic/test/720p"))
     results = run_sweep(1, max_samples, seeds=num_seeds, experiment_name=experiment_name, masks=masks, pca_dim=pca_dim, save_csv=True)

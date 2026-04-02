@@ -22,6 +22,7 @@ COUNT_LINE_COLOR = "#374151"
 COUNT_FILL_COLOR = "#9ca3af"
 COUNT_ALPHA = 0.22
 RANDOM_LINE_COLOR = "#6b7280"
+XTICK_STEP = 20
 COLORS = [
     "#1b9e77",
     "#d95f02",
@@ -37,19 +38,22 @@ COLORS = [
 SPECIAL_STYLES = {
     "mlp": {"color": "#c44e52", "linestyle": "--"},
 }
-PCA_WHITE_PREFIX = "prototype_pca_white_"
-PCA_WHITE_KEEP_SUFFIX = "_512"
-EXCLUDED_FOLDERS = [
-    "prototypes_slow",
-]
+SWEEP_PREFIX = "prototype_pca_white_cosine_"
+SWEEP_DIM_MIN = 128
+SWEEP_DIM_MAX = 2056
 REFERENCE_LINES = {
     "mIoU": [
         ("SPECIFIC (oracle class)", 0.5522, "#8f5e3c"),
     ],
 }
 PLOTS = [
-    (("mIoU",), "plot_miou_runs.png", "mIoU (%)", "mIoU across runs"),
-    (("accuracy_cosine", "accuracy_euclidean"), "plot_accuracy_runs.png", "Accuracy (%)", "Accuracy across runs"),
+    (("mIoU",), "plot_miou_runs_pca_white_cosine_sweep.png", "mIoU (%)", "mIoU across PCA-white cosine sweep"),
+    (
+        ("accuracy_cosine", "accuracy_euclidean"),
+        "plot_accuracy_runs_pca_white_cosine_sweep.png",
+        "Accuracy (%)",
+        "Accuracy across PCA-white cosine sweep",
+    ),
 ]
 
 
@@ -98,18 +102,31 @@ def aggregate_folder(folder: Path, metric: str) -> tuple[np.ndarray, np.ndarray,
     return x, np.nanmean(values, axis=0), np.nanstd(values, axis=0), values.shape[0]
 
 
+def folder_dim(folder: Path) -> int | None:
+    if not folder.name.startswith(SWEEP_PREFIX):
+        return None
+    dim_text = folder.name.removeprefix(SWEEP_PREFIX)
+    if not dim_text.isdigit():
+        return None
+    dim = int(dim_text)
+    if dim < SWEEP_DIM_MIN or dim > SWEEP_DIM_MAX:
+        return None
+    return dim
+
+
 def result_folders() -> list[Path]:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    folder_dims = [(folder, folder_dim(folder)) for folder in RESULTS_DIR.iterdir() if folder.is_dir()]
     folders = [
         folder
-        for folder in sorted(RESULTS_DIR.iterdir())
-        if folder.is_dir()
-        and folder.name not in EXCLUDED_FOLDERS
-        and list(folder.glob("*_computed.csv"))
-        and (not folder.name.startswith(PCA_WHITE_PREFIX) or folder.name.endswith(PCA_WHITE_KEEP_SUFFIX))
+        for folder, dim in folder_dims
+        if dim is not None and list(folder.glob("*_computed.csv"))
     ]
-    assert folders, f"No result folders with *_computed.csv in {RESULTS_DIR}"
-    return folders
+    assert folders, (
+        f"No result folders matching {SWEEP_PREFIX}<dim> in [{SWEEP_DIM_MIN}, {SWEEP_DIM_MAX}] "
+        f"with *_computed.csv in {RESULTS_DIR}"
+    )
+    return sorted(folders, key=lambda folder: int(folder.name.removeprefix(SWEEP_PREFIX)))
 
 
 def folder_styles(folders: list[Path]) -> dict[str, dict[str, str]]:
@@ -153,9 +170,9 @@ def classes_with_at_least_x_images(folders: list[Path]) -> tuple[np.ndarray, np.
 
 
 def sample_ticks(samples: np.ndarray) -> list[int]:
-    count = min(12, len(samples))
-    indices = np.linspace(0, len(samples) - 1, num=count, dtype=int)
-    return [int(samples[index]) for index in indices]
+    max_sample = int(samples.max())
+    ticks = list(range(XTICK_STEP, max_sample + 1, XTICK_STEP))
+    return ticks if ticks else [max_sample]
 
 
 def num_classes(folders: list[Path]) -> int:
@@ -239,6 +256,7 @@ def plot_classes_with_at_least_x(ax: plt.Axes, samples: np.ndarray, totals: np.n
     ax.fill_between(samples, totals, step="post", color=COUNT_FILL_COLOR, alpha=COUNT_ALPHA)
     ax.set_xlabel("x images per class")
     ax.set_ylabel("Classes with >= x")
+    ax.set_yscale("log")
     ax.yaxis.set_major_formatter(StrMethodFormatter("{x:,.0f}"))
     ax.grid(True, axis="y", color="#d1d5db", linewidth=1.0)
     ax.grid(False, axis="x")
