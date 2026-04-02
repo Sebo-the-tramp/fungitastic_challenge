@@ -9,17 +9,25 @@
 %\end{figure}
 
 \subsection{Dataset}
-We evaluate our approach in the FungiTastic dataset \cite{Picek_2025_CVPR}, a fine-grained benchmark characterized by subtle differences between classes and a highly imbalanced, long-tailed distribution. We consider only the portion of the dataset comprising segmentation masks. The subset contains approximately 13k images with segmentation annotations (Fig.~\ref{fig:fungitastic}) spanning over 200 different classes. 
-
-To ensure consistent evaluation, we restrict the label space to 194 classes present in both training and test splits. We report results in one-shot, few-shot, and low data regimes. Unless otherwise stated, the evaluation is performed on the full test set without rebalancing.
+We evaluate our approach in the FungiTastic dataset \cite{Picek_2025_CVPR}, a fine-grained benchmark characterized by subtle differences between classes and a highly imbalanced, long-tailed distribution. We consider only the portion of the dataset comprising segmentation masks. The subset contains approximately 13k images with segmentation annotations (Fig.~\ref{fig:fungitastic}) spanning over 194 different classes. 
+%To ensure consistent evaluation, we restrict the label space to 194 classes present in both training and test splits. 
+We report results in one-shot, few-shot, and low data regimes. Unless otherwise stated, the evaluation is performed on the test set and final results are reported in terms of average metrics and standard deviation across $20$ different runs.
 
 \subsection{Evaluation Protocol}
 
-\paragraph{General Baseline + Oracle.} We prompt SAM3 with the string ``mushrooms" which constitutes our macro taxonomic prompt and retain the output by threholding at 0.5. This constitutes the general ability of the model to segment all kind of mushrooms with class agnostic knowledge. We then assume an oracle classification of pixels in order to compute the macro taxonomic upper bound (i.e. how good is SAM3 at segmenting mushrooms).
+\paragraph{General Baseline + Oracle.} We prompt SAM3 with the string ``mushrooms" which constitutes our macro taxonomic prompt and retain the output by thresholding at 0.5. This constitutes the general ability of the model to segment all kind of mushrooms with class agnostic knowledge. We then assume an oracle classification of pixels in order to compute the macro taxonomic upper bound as shown in Table~\ref{tab:macromicro} (i.e. how good is SAM3 at segmenting mushrooms).
 
-\paragraph{Fine-Grained Baseline + Oracle.} To produce fine-grained SAM segmentations we cannot assume a priori knowledge; therefore, we would need to forward each test image 194 times (i.e., one for each class). This results in a segmentation cost that grows linearly with the number of classes. To this end, we assume that an oracle provides exact taxonomic scientific names, and we use these as prompts for SAM3. We then retain the output by thresholding at 0.3. This baseline is useful to investigate the abilities of SAM3 when prompted with exact classes (ex. ``boletus edulis" or ``amanita muscaria"). This also acts as our upper bound. 
+\paragraph{Fine-Grained Baseline + Oracle.} To produce fine-grained SAM segmentations we cannot assume a priori knowledge; therefore, we would need to forward each test image 194 times (i.e. one for each class). This results in a segmentation cost that grows linearly with the number of classes. To this end, we assume that an oracle provides exact taxonomic scientific names, and we use these as prompts for SAM3. We then retain the output by thresholding to 0.3, adopting a lower threshold with respect to the macro-taxonomic baseline to take into account the decreased confidence scores of SAM3 when asked for specific classes, as reported in the original work \cite{carion2025sam3segmentconcepts}. This baseline is useful to investigate the abilities of SAM3 when prompted with exact classes (ex. ``boletus edulis" or ``amanita muscaria"). This also acts as our upper bound and the result is reported in Table~\ref{tab:macromicro}
 
-\paragraph{Our Method} Our baseline proposal starts from macro taxonomic segmentations and aim to assign class labels in a separate stage through training-free prototype based algorithm. Our primary backbone is DINOv3 \cite{simeoni2025dinov3}, used as a frozen feature extractor. Unless otherwise stated, we use the \texttt{[CLS]} token as the feature representation for DINOv3. Here, segmentation costs are constant with respect to the label space.
+\paragraph{Our Method} Our baseline proposal starts from macro taxonomic segmentations and aim to assign class labels in a separate stage through training-free prototype based algorithm. Our primary backbone is DINOv3 \cite{simeoni2025dinov3}, used as a frozen feature extractor. Unless otherwise stated, we use the \texttt{[CLS]} token as the feature representation for DINOv3. Here, segmentation costs are constant with respect to the label space. To put ourselves in the low data regime, we run different seeds ( \textcolor{red}{$n=20$}) by selecting uniformly a subset of the training set, we do so to provide numbers in the low data regime setting. During training phase dinov3 extracts features for each image which are then projected with pca and whitened . We do so to impose a better metric space which accomodates prototype matching. During inference we extract the features of the image with dino and match the closest prototype in order to assign the class, parallely we forward the image to sam3 which provides macro taxonomic segmentation. we then convert themacro taxonomic segmentation into fine grained segmentation by assigning at each segmentation pixel the class of the closest prototype   
+
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=0.8\linewidth]{paper/media/schema.png}
+    \caption{Pipeline}
+    \label{fig:placeholder}
+\end{figure*}
 
 
  %We additionally evaluate DINOv2 \cite{oquab2023dinov2}, CLIP \cite{radford2021learningtransferablevisualmodels}, \SCc{and masked autoencoder variants to assess the impact of representation quality.}
@@ -29,12 +37,20 @@ To ensure consistent evaluation, we restrict the label space to 194 classes pres
 %\paragraph{Segment-based augmentations.}
 %Leveraging the available segmentation masks, we construct augmented views by modifying the background while preserving the foreground object. Specifically, we (i) mask the background and (ii) apply background blurring. These augmentations are used to enrich feature representations in low-data regimes.
 
-\paragraph{Metrics.}
-We report top-1 and top-5 classification accuracy, as well as mean IoU for segmentation. Additionally, we introduce classification-aware IoU (CaIoU), defined as:
-\[
-\mathrm{CaIoU} = \mathrm{IoU}(\hat{M}, M) \cdot \mathbf{1}[\hat{y} = y],
-\]
-which measures segmentation quality conditioned on correct classification.
+\subsection{Metrics.}
+We report mean class accuracy (mAcc) for image-level classification and mean Intersection over Union (mIoU) for segmentation. Let $C$ denote the number of classes, and let $\mathbf{M^{I}} \in \mathbb{N}^{C \times C}$ be the image-level confusion matrix and $\mathbf{M^{P}} \in \mathbb{N}^{C \times C}$ the pixel-level confusion matrix. We consider $M_{ij}$ as the number of samples whose ground-truth class is $i$ and predicted class is $j$.
+
+\paragraph{Mean Accuracy  (mAcc)}
+\begin{equation}
+\mathrm{mAcc} = \frac{1}{C} \sum_{i=1}^{C} \frac{M^{I}_{ii}}{\sum_{j=1}^{C} M^{I}_{ij}},
+\end{equation}
+that is, the average across classes of the diagonal entries normalized by the total number of ground-truth samples in each class.
+
+\paragraph{Mean IoU (mIoU)}
+\begin{equation}
+\mathrm{mIoU} = \frac{1}{C} \sum_{i=1}^{C} \frac{M^{P}_{ii}}{\sum_{j=1}^{C} M^{P}_{ij} + \sum_{j=1}^{C} M^{P}_{ji} - M^{P}_{ii}},
+\end{equation}
+which corresponds to the average, over all classes, of the ratio between true positives and the union of ground-truth and predicted pixels for that class.
 
 % \section{Experimental Setup}
 % \label{sec:setup}
