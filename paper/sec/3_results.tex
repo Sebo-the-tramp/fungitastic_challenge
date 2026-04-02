@@ -1,14 +1,20 @@
 \section{Results}
 \label{sec:results}
-The FungiTastic dataset is characterized by substantial nuisance variability, including changes in background, illumination, zoom, acquisition conditions, and broader domain shift. These factors dominate the geometry of DINOv3 CLS-token embeddings, masking directions that are more informative for fine-grained fungi classification. As shown in \ref{fig:teaser} (right), neither raw-feature normalization in the original $4096$-dimensional space nor vanilla PCA is sufficient to effectively distinguish classes, revealing the mismatch between the intrinsic geometry of the embedding space and the class-discriminative metric required for prototype comparison. The discriminative class structure emerges more clearly after PCA whitening, i.e. after projecting the features onto the principal-component basis and rescaling each retained component by its standard deviation. The resulting decorrelated and variance balanced representation makes cosine similarity less influenced by nuisance class-independent and high-variance directions, allowing lower and medium-variance class-specific components to contribute more effectively to class separation.
 
-When considering the resulting mIoU performances \ref{fig:teaser} (left).... 
+\paragraph{Accuracy} Results shown in Figure~\ref{fig:teaser} (left) shows that standard normalized DINOv3 embeddings without any feature preprocessing achieve a performance \textcolor{red}{$\sim 30\%$} of mAcc, Taking in account feature preprocessing unlocks more than $\sim 20\%$ of improvement.   
 
+\paragraph{Feature Preprocessing} The FungiTastic dataset is characterized by substantial nuisance variability, including changes in background, illumination, zoom, acquisition conditions, and broader domain shift. These factors dominate the geometry of DINOv3 CLS-token embeddings, masking directions that are more informative for fine-grained fungi classification. As shown in \ref{fig:teaser} (right), neither raw-feature normalization in the original $4096$-dimensional space nor vanilla PCA is sufficient to effectively distinguish classes, revealing the mismatch between the intrinsic geometry of the embedding space and the class-discriminative metric required for prototype comparison. The discriminative class structure emerges more clearly after PCA whitening, i.e. after projecting the features onto the principal-component basis and rescaling each retained component by its standard deviation. The resulting decorrelated and variance balanced representation makes cosine similarity less influenced by nuisance class-independent and high-variance directions, allowing lower and medium-variance class-specific components to contribute more effectively to class separation.
+
+\textcolor{red}{Inserire tabella con qualche numero!}
+
+\paragraph{mIoU}
+In the proposed pipeline the final segmentation performance depends on the interplay between the prototype-based classifier and the segmentation masks provided upfront by SAM3 queried with the generic macro-taxonomic class "mushroom".  
+When considering the resulting mIoU performances \ref{fig:teaser} (right \textcolor{red}{finish here with some cleaver comment} 
 
 
 \begin{comment}
 \paragraph{Result flow.}
-After the teaser comparisons, the body of the paper should answer three follow-up questions from the README and the planned fusion extension: which frozen backbone family is strongest, whether diversity matters more than quantity when combining backbones, and which lightweight classifier extracts the most from those features. The next blocks are placed in that order so the paper reads from top-line segmentation comparisons to broader backbone and fusion ablations, then to the classifier comparison, before zooming into the currently completed DINOv3 slice.
+
 
 \begin{center}
     \includegraphics[width=\linewidth]{example-image}
@@ -104,9 +110,3 @@ The current classifier comparison is only partially populated, but the 224 $k$-N
 The README-level paper is larger than the completed slice. The 200-class oracle teaser is now exported, but the 2000-class SAM-3 teaser, the cross-family backbone sweep, the fusion ablation, and the prototype and linear-probe baselines are still missing. The current paper therefore reports a real first result slice while keeping those missing pieces explicit.
 
 \end{comment}
-
-\paragraph{Future works}
-\begin{itemize}
-    \item class token + masked patch embeddings in the prototype approach
-    \item different backbones
-\end{itemize}
