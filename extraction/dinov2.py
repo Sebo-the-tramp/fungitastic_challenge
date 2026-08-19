@@ -15,7 +15,7 @@ import torch.nn.functional as F
 
 from utils import read_segments, polygon_to_mask
 
-PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2")
+PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026")
 DATASET_ROOT = Path("/data0/sebastian.cavada/datasets/FungiTastic")
 OUTPUT_ROOT = PROJECT_ROOT / "data_processed"
 MODEL_NAME = os.environ.get("MODEL_NAME", "facebook/dinov2-with-registers-small")

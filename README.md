@@ -1,24 +1,29 @@
-# Fungitastic experiments
+# Few-shot semantic segmentation
 
-## Structure of the paper
+## Datasets
+- Fungitastic -> need to test on the 2000 classes too
 
-### Teaser thing
 
-2 graphs
-- 200 classes+oracle segmentation -> all dinov3 suite, no-segmentation, oracle segmentation, sam-3 segmentation with MLP classification
-- 2000 classes+sam3 segmentation -> all dinov3 suite, no-segmentation, sam-3 segmentation with MLP classification
+## Related works
+- https://arxiv.org/pdf/2603.28480 -> "INSID3" our baseline probably
+- https://arxiv.org/pdf/2507.02798 (simile con SAM + DINO)
+- https://arxiv.org/pdf/2410.06964 (un po' piu complesso con dei grafi...)
+- https://arxiv.org/pdf/2305.13310 (2024, con reference points nella query image)
 
-(segmentation -> patch segmented mean, whole mean and registers stuff)
 
-### ablation different methods with single class/feature tokens
+## Backbones to test
+### Self-supervised
+- DinoV3
+- DinoV2
+- Dino
 
-- CLIP, siglip
-- MAE
-- dino1/dino2/dino3
-- InternVit
+### Supervised
+- CLIP/OpenClip
+- SigCLIP
 
-### Ablation on the different methods of classification
-- protoype
-- knn 
-- linear probing
-- MLP
+### MLLM
+- InternVIT
+
+### Segmentation
+- SAM3
+

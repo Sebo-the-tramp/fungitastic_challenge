@@ -12,7 +12,7 @@ from tqdm.auto import tqdm
 from transformers import AutoModel, CLIPImageProcessor
 import torchvision.transforms.functional as TF
 
-PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2")
+PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026")
 DATASET_ROOT = Path("/data0/sebastian.cavada/datasets/FungiTastic")
 OUTPUT_ROOT = PROJECT_ROOT / "data_processed"
 MODEL_NAME = os.environ.get("MODEL_NAME", "OpenGVLab/InternViT-6B-448px-V2_5")

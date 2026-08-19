@@ -13,7 +13,7 @@ from transformers import AutoImageProcessor, AutoModel
 import torchvision.transforms.functional as TF
 import torch.nn.functional as F
 
-PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2")
+PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026")
 DATASET_ROOT = Path("/data0/sebastian.cavada/datasets/FungiTastic")
 OUTPUT_ROOT = PROJECT_ROOT / "data_processed"
 MODEL_NAME = os.environ.get("MODEL_NAME", "facebook/dinov3-vit7b16-pretrain-lvd1689m")
@@ -141,7 +141,7 @@ if __name__ == "__main__":
                     class_counts[label] = 0
                 class_counts[label] += 1
         
-        save_path = "/home/cavadalab/Documents/scsv/fungitastic2026_2/paper/media/class_distribution"
+        save_path = "/home/cavadalab/Documents/scsv/fungitastic2026/paper/media/class_distribution"
         os.makedirs(save_path, exist_ok=True)
         create_graph(class_counts, splits, save_path)
 

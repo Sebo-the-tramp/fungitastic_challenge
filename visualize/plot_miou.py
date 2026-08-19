@@ -5,7 +5,8 @@ from pathlib import Path
 
 import matplotlib
 import numpy as np
-from matplotlib.ticker import StrMethodFormatter
+from matplotlib import transforms as mtransforms
+from matplotlib.ticker import FixedLocator, StrMethodFormatter
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -21,7 +22,14 @@ TITLE_FONT_SIZE = 40
 COUNT_LINE_COLOR = "#374151"
 COUNT_FILL_COLOR = "#9ca3af"
 COUNT_ALPHA = 0.22
+XTICK_STEP = 20
+LEGEND_Y_OFFSET_PX = 50
 RANDOM_LINE_COLOR = "#6b7280"
+RANDOM_BASELINE_DENOM = 194
+RANDOM_BASELINE_VALUE = 1.0 / RANDOM_BASELINE_DENOM
+MIOU_Y_MIN = 5.0
+MIOU_Y_MAX = 65.0
+MIOU_Y_TICKS = [10.0, 20.0, 30.0, 40.0, 50.0]
 COLORS = [
     "#1b9e77",
     "#d95f02",
@@ -38,7 +46,7 @@ SPECIAL_STYLES = {
     "mlp": {"color": "#c44e52", "linestyle": "--"},
 }
 PCA_WHITE_PREFIX = "prototype_pca_white_"
-PCA_WHITE_KEEP_SUFFIX = "_512"
+PCA_WHITE_KEEP_SUFFIX = "_1024"
 EXCLUDED_FOLDERS = [
     "prototypes_slow",
 ]
@@ -48,8 +56,8 @@ REFERENCE_LINES = {
     ],
 }
 PLOTS = [
-    (("mIoU",), "plot_miou_runs.png", "mIoU (%)", "mIoU across runs"),
-    (("accuracy_cosine", "accuracy_euclidean"), "plot_accuracy_runs.png", "Accuracy (%)", "Accuracy across runs"),
+    (("mIoU",), "plot_miou_runs.png", "mIoU (%)", "mIoU"),
+    (("accuracy_cosine", "accuracy_euclidean"), "plot_accuracy_runs.png", "Accuracy (%)", "mAcc"),
 ]
 
 
@@ -63,6 +71,15 @@ def computed_csv_paths(folder: Path) -> list[Path]:
     paths = sorted(folder.glob("*_computed.csv"), key=lambda path: int(path.stem.split("_", 1)[0]))
     assert paths, f"Missing *_computed.csv in {folder}"
     return paths
+
+
+def has_expected_header(folder: Path) -> bool:
+    paths = sorted(folder.glob("*_computed.csv"), key=lambda path: int(path.stem.split("_", 1)[0]))
+    if not paths:
+        return False
+    with paths[0].open(newline="") as handle:
+        first_line = handle.readline().strip()
+    return first_line.startswith("samples_per_class,")
 
 
 def metric_names(folder: Path) -> list[str]:
@@ -105,7 +122,7 @@ def result_folders() -> list[Path]:
         for folder in sorted(RESULTS_DIR.iterdir())
         if folder.is_dir()
         and folder.name not in EXCLUDED_FOLDERS
-        and list(folder.glob("*_computed.csv"))
+        and has_expected_header(folder)
         and (not folder.name.startswith(PCA_WHITE_PREFIX) or folder.name.endswith(PCA_WHITE_KEEP_SUFFIX))
     ]
     assert folders, f"No result folders with *_computed.csv in {RESULTS_DIR}"
@@ -153,16 +170,14 @@ def classes_with_at_least_x_images(folders: list[Path]) -> tuple[np.ndarray, np.
 
 
 def sample_ticks(samples: np.ndarray) -> list[int]:
-    count = min(12, len(samples))
-    indices = np.linspace(0, len(samples) - 1, num=count, dtype=int)
-    return [int(samples[index]) for index in indices]
-
-
-def num_classes(folders: list[Path]) -> int:
-    with reference_raw_csv_path(folders).open(newline="") as handle:
-        classes = {int(row["gt_class"]) for row in csv.DictReader(handle)}
-    assert classes, f"No gt_class values found in raw csv under {RESULTS_DIR}"
-    return len(classes)
+    max_sample = int(samples.max())
+    ticks: list[int] = []
+    base = 1
+    while base <= max_sample:
+        ticks.extend([base, 2 * base, 5 * base])
+        base *= 10
+    ticks = sorted({tick for tick in ticks if tick <= max_sample})
+    return ticks if ticks[-1] == max_sample else ticks + [max_sample]
 
 
 def apply_style() -> None:
@@ -183,8 +198,7 @@ def apply_style() -> None:
 def add_reference_lines(ax: plt.Axes, folders: list[Path], metric: str) -> None:
     lines = list(REFERENCE_LINES.get(metric, []))
     if metric.startswith("accuracy_"):
-        classes = num_classes(folders)
-        lines.append((f"Random (1/{classes})", 1.0 / classes, RANDOM_LINE_COLOR))
+        lines.append((f"Random (1/{RANDOM_BASELINE_DENOM})", RANDOM_BASELINE_VALUE, RANDOM_LINE_COLOR))
     for name, value, color in lines:
         y = value * 100.0
         ax.axhline(y, color=color, linewidth=2.0, linestyle=":")
@@ -211,27 +225,64 @@ def plot_metric_panel(
     title: str,
     show_legend: bool,
 ) -> None:
+    is_miou = metrics[0] == "mIoU"
     folder_metrics = {folder: resolve_metric(folder, metrics) for folder in folders}
     metric_folders = [folder for folder, metric in folder_metrics.items() if metric is not None]
     assert metric_folders, f"No result folders with metrics {metrics} in {RESULTS_DIR}"
+    upper_max = 0.0
     for folder in metric_folders:
         metric = folder_metrics[folder]
         assert metric is not None
-        x, mean, std, num_runs = aggregate_folder(folder, metric)
+        x, mean, std, _ = aggregate_folder(folder, metric)
         style = styles[folder.name]
         color = style["color"]
         linestyle = style["linestyle"]
-        label = f"{folder.name} (n={num_runs})"
+        label = folder.name
         ax.plot(x, mean, color=color, linewidth=LINE_WIDTH, linestyle=linestyle, label=label)
         ax.fill_between(x, mean - std, mean + std, color=color, alpha=ALPHA)
+        upper_max = max(upper_max, float(np.nanmax(mean + std)))
+
+    for _, value, _ in REFERENCE_LINES.get(metrics[0], []):
+        upper_max = max(upper_max, value * 100.0)
+    if metrics[0].startswith("accuracy_"):
+        upper_max = max(upper_max, RANDOM_BASELINE_VALUE * 100.0)
+
+    y_max = max(10.0, float(np.ceil(upper_max / 10.0) * 10.0))
     add_reference_lines(ax, folders, metrics[0])
+    if is_miou:
+        ax.set_yscale("log")
+        ax.set_ylim(bottom=MIOU_Y_MIN, top=MIOU_Y_MAX)
+        ax.yaxis.set_major_locator(FixedLocator(MIOU_Y_TICKS))
+        ax.yaxis.set_major_formatter(StrMethodFormatter("{x:.0f}"))
+    else:
+        ax.set_yscale("linear")
+        ax.set_ylim(0.0, y_max)
     ax.set_ylabel(ylabel)
     ax.set_title(title, fontsize=TITLE_FONT_SIZE)
-    ax.grid(True, axis="y", color="#d1d5db", linewidth=1.0)
+    ax.grid(False, axis="y")
+    if is_miou:
+        for y in MIOU_Y_TICKS:
+            ax.axhline(y=y, color="#d1d5db", linewidth=1.0, zorder=0)
+    else:
+        for y in range(10, int(y_max) + 1, 10):
+            ax.axhline(y=float(y), color="#d1d5db", linewidth=1.0, zorder=0)
     ax.grid(False, axis="x")
     ax.tick_params(axis="x", labelbottom=False)
     if show_legend:
-        ax.legend(frameon=False, ncols=2, loc="lower right")
+        if metrics[0].startswith("accuracy_"):
+            offset = mtransforms.ScaledTranslation(0.0, LEGEND_Y_OFFSET_PX / ax.figure.dpi, ax.figure.dpi_scale_trans)
+            ax.legend(
+                frameon=True,
+                ncols=2,
+                loc="lower right",
+                bbox_to_anchor=(1.0, 0.0),
+                bbox_transform=ax.transAxes + offset,
+                facecolor="white",
+                edgecolor="#d1d5db",
+                framealpha=0.95,
+            )
+        else:
+            ax.legend(frameon=True, ncols=2, loc="lower right", facecolor="white", edgecolor="#d1d5db", framealpha=0.95)
 
 
 def plot_classes_with_at_least_x(ax: plt.Axes, samples: np.ndarray, totals: np.ndarray) -> None:
@@ -239,6 +290,7 @@ def plot_classes_with_at_least_x(ax: plt.Axes, samples: np.ndarray, totals: np.n
     ax.fill_between(samples, totals, step="post", color=COUNT_FILL_COLOR, alpha=COUNT_ALPHA)
     ax.set_xlabel("x images per class")
     ax.set_ylabel("Classes with >= x")
+    ax.set_yscale("linear")
     ax.yaxis.set_major_formatter(StrMethodFormatter("{x:,.0f}"))
     ax.grid(True, axis="y", color="#d1d5db", linewidth=1.0)
     ax.grid(False, axis="x")
@@ -260,6 +312,8 @@ def make_panel_figure(
     grid = fig.add_gridspec(2, 1, height_ratios=(4.2, 1.35), hspace=0.06)
     ax_metric = fig.add_subplot(grid[0])
     ax_bar = fig.add_subplot(grid[1], sharex=ax_metric)
+    ax_metric.set_xscale("log")
+    ax_bar.set_xscale("log")
     plot_metric_panel(ax_metric, folders, styles, metrics, ylabel, title, show_legend=True)
     plot_classes_with_at_least_x(ax_bar, samples, class_counts)
     return fig

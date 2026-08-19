@@ -10,7 +10,7 @@ BACKGROUNDS=(
 )
 
 # DINOV2 MODELS
-PYTHON="/home/cavadalab/Documents/scsv/fungitastic2026_2/.venv/bin/python"
+PYTHON="/home/cavadalab/Documents/scsv/fungitastic2026/.venv/bin/python"
 MODELS=(
     # "facebook/dinov3-vits16-pretrain-lvd1689m"
     # "facebook/dinov3-vits16plus-pretrain-lvd1689m"

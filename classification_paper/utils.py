@@ -21,7 +21,7 @@ RUNS_ROOT = ROOT / "results" / "runs"
 EXPERIMENTS_PATH = ROOT / "dashboard" / "experiments.json"
 RESULTS_PATH = ROOT / "dashboard" / "results.json"
 
-PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2")
+PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026")
 DATASET_ROOT = Path("/data0/sebastian.cavada/datasets/FungiTastic")
 
 DATA_SUBSET = os.environ.get("DATA_SUBSET", "all")
@@ -165,10 +165,10 @@ def load_masks(mask_base_path: Path) -> torch.Tensor:
 
     if "specific" in str(mask_base_path):
         print("Loading specific SAM masks...")
-        cache_path = "/home/cavadalab/Documents/scsv/fungitastic2026_2/classification_paper/cache/sam_masks_specific.pt"
+        cache_path = "/home/cavadalab/Documents/scsv/fungitastic2026/classification_paper/cache/sam_masks_specific.pt"
     elif "generic" in str(mask_base_path):
         print("Loading generic SAM masks...")
-        cache_path = "/home/cavadalab/Documents/scsv/fungitastic2026_2/classification_paper/cache/sam_masks_general.pt"
+        cache_path = "/home/cavadalab/Documents/scsv/fungitastic2026/classification_paper/cache/sam_masks_general.pt"
     else:
         assert False, f"Unknown mask type in path: {mask_base_path}"
 
@@ -497,15 +497,20 @@ def compute_metrics_final_fast(data_raw, num_classes=None):
     """
     Computes Image-level and Pixel-level metrics from data_raw.
     """
+    pred_class_top_5 = None
     if isinstance(data_raw, dict):
         gt_class = torch.as_tensor(data_raw["gt_class"], dtype=torch.long)
         pred_class = torch.as_tensor(data_raw["pred_class"], dtype=torch.long)
+        if "pred_class_top_5" in data_raw:
+            pred_class_top_5 = torch.as_tensor(data_raw["pred_class_top_5"], dtype=torch.long)
         total_pixels = torch.as_tensor(data_raw["total_pixels"], dtype=torch.float64)
         pixel_in = torch.as_tensor(data_raw["pixel_in"], dtype=torch.float64)
         pixel_out = torch.as_tensor(data_raw["pixel_out"], dtype=torch.float64)
     else:
         gt_class = torch.tensor([d["gt_class"] for d in data_raw], dtype=torch.long)
         pred_class = torch.tensor([d["pred_class"] for d in data_raw], dtype=torch.long)
+        if "pred_class_top_5" in data_raw[0]:
+            pred_class_top_5 = torch.tensor([d["pred_class_top_5"] for d in data_raw], dtype=torch.long)
         total_pixels = torch.tensor([d["total_pixels"] for d in data_raw], dtype=torch.float64)
         pixel_in = torch.tensor([d["pixel_in"] for d in data_raw], dtype=torch.float64)
         pixel_out = torch.tensor([d["pixel_out"] for d in data_raw], dtype=torch.float64)
@@ -520,6 +525,11 @@ def compute_metrics_final_fast(data_raw, num_classes=None):
     correct_count = torch.bincount(gt_class[correct_mask], minlength=num_classes)
     valid_gt = gt_count > 0
     macro_img_acc = (correct_count[valid_gt].to(torch.float64) / gt_count[valid_gt]).mean().item()
+    if pred_class_top_5 is not None:
+        correct_top_5_mask = (pred_class_top_5 == gt_class.unsqueeze(1)).any(dim=1)
+        overall_img_acc_top_5 = correct_top_5_mask.to(torch.float64).mean().item()
+        correct_top_5_count = torch.bincount(gt_class[correct_top_5_mask], minlength=num_classes)
+        macro_img_acc_top_5 = (correct_top_5_count[valid_gt].to(torch.float64) / gt_count[valid_gt]).mean().item()
 
     intersection = torch.bincount(gt_class[correct_mask], weights=pixel_in[correct_mask], minlength=num_classes)
     total_gt_area = torch.bincount(gt_class, weights=total_pixels, minlength=num_classes)
@@ -532,7 +542,9 @@ def compute_metrics_final_fast(data_raw, num_classes=None):
 
     return {
         "overall_img_acc": overall_img_acc,
+        **({"overall_img_acc_top_5": overall_img_acc_top_5} if pred_class_top_5 is not None else {}),
         "macro_img_acc": macro_img_acc,
+        **({"macro_img_acc_top_5": macro_img_acc_top_5} if pred_class_top_5 is not None else {}),
         "macro_pixel_acc": macro_pixel_acc,
         "mIoU": miou,
     }

@@ -20,7 +20,7 @@ DEVICE = os.environ.get("DEVICE", "cuda" if torch.cuda.is_available() else "cpu"
 
 MODEL_TRAIN = Path(f"facebook/{BACKBONE}/bfloat16_normal_{IMAGE_SIZE}/train")
 MODEL_TEST = Path(f"facebook/{BACKBONE}/bfloat16_normal_{IMAGE_SIZE}/test")
-ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed")
+ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026/data_processed")
 CLASSIFICATION_RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
 
@@ -110,7 +110,9 @@ def prototype_method(
     prototypes = prototypes / torch.bincount(train_labels, minlength=num_classes).unsqueeze(1)
 
     distances = pairwise_cosine_distance(test_features, prototypes)
+    top_k = min(5, num_classes)
     pred_class = distances.argmin(dim=1).cpu()
+    pred_class_top_5 = torch.topk(distances, k=top_k, dim=1, largest=False).indices.cpu()
 
     raw_data = []
     test_labels_cpu = test_labels.cpu()
@@ -128,6 +130,7 @@ def prototype_method(
     return raw_data, {
         "gt_class": test_labels_cpu,
         "pred_class": pred_class,
+        "pred_class_top_5": pred_class_top_5,
         "total_pixels": total_pixels,
         "pixel_in": pixel_in,
         "pixel_out": pixel_out,
@@ -249,9 +252,10 @@ if __name__ == "__main__":
 
     max_samples = 200
     # num_seeds = [7, 42, 123, 2024, 9999][:1]
-    np.random.seed(42)
-    num_seeds = list(map(int, np.random.randint(0, 10000, size=20)))
+    num_seeds = [4555]
+    # np.random.seed(42)
+    # num_seeds = list(map(int, np.random.randint(0, 10000, size=20)))
     experiment_name = "prototype_normalized_cosine"
 
-    masks = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed/sam3_yolo_generic_mushroom_200/all/test/720/FungiTastic/test/720p"))
+    masks = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026/data_processed/sam3_yolo_generic_mushroom_200/all/test/720/FungiTastic/test/720p"))
     results = run_sweep(1, max_samples, seeds=num_seeds, experiment_name=experiment_name, masks=masks, save_csv=True)

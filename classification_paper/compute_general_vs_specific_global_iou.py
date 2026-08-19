@@ -17,7 +17,7 @@ SEED = 7
 BACKBONE = os.environ.get("BACKBONE", "dinov3-vit7b16-pretrain-lvd1689m")
 IMAGE_SIZE = os.environ.get("IMAGE_SIZE", 448)
 
-PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2")
+PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026")
 DATASET_ROOT = Path("/data0/sebastian.cavada/datasets/FungiTastic")
 
 DATA_SUBSET = os.environ.get("DATA_SUBSET", "all")
@@ -33,7 +33,7 @@ POLYGON_CLOSE_KERNEL_SIZE = 3
 
 MODEL_TRAIN = Path(f"facebook/{BACKBONE}/bfloat16_normal_{IMAGE_SIZE}/train")
 MODEL_TEST = Path(f"facebook/{BACKBONE}/bfloat16_normal_{IMAGE_SIZE}/test")
-ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed")
+ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026/data_processed")
 CLASSIFICATION_RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
 sys.path.append(str(PROJECT_ROOT / "FungiTastic"))
@@ -111,13 +111,11 @@ if __name__ == "__main__":
     num_seeds = [7, 42, 123, 2024, 9999]
     experiment_name = "prototype"
 
-    sam_masks_general = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed/sam3_yolo_generic_mushroom_200/all/test/720/FungiTastic/test/720p"))
-    sam_masks_specific = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed/sam3_yolo_specific_mushroom_200/all/test/720/FungiTastic/test/720p"))
+    sam_masks_general = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026/data_processed/sam3_yolo_generic_mushroom_200/all/test/720/FungiTastic/test/720p"))
+    sam_masks_specific = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026/data_processed/sam3_yolo_specific_mushroom_200/all/test/720/FungiTastic/test/720p"))
 
     computed_iou_general, _ = compute_metric(sam_masks_general)
     print(f"Macro IoU - GENERAL: {computed_iou_general:.4f}")
     
     computed_iou_specific, _ = compute_metric(sam_masks_specific)
-    print(f"Macro IoU - SPECIFIC: {computed_iou_general:.4f}")
-
-
+    print(f"Macro IoU - SPECIFIC: {computed_iou_specific:.4f}")

@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.table import Table
 from tqdm.auto import tqdm
 
-PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2")
+PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026")
 DATASET_ROOT = Path("/data0/sebastian.cavada/datasets/FungiTastic")
 METADATA_PATH = DATASET_ROOT / "metadata" / "FungiTastic" / "FungiTastic-Train.csv"
 MASKS_PATH = DATASET_ROOT / "masks" / "FungiTastic-Mini-TrainMasks.parquet"

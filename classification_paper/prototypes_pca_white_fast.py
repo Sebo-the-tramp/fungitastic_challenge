@@ -20,8 +20,15 @@ DEVICE = os.environ.get("DEVICE", "cuda" if torch.cuda.is_available() else "cpu"
 
 MODEL_TRAIN = Path(f"facebook/{BACKBONE}/bfloat16_normal_{IMAGE_SIZE}/train")
 MODEL_TEST = Path(f"facebook/{BACKBONE}/bfloat16_normal_{IMAGE_SIZE}/test")
-ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed")
-CLASSIFICATION_RESULTS_DIR = Path(__file__).resolve().parent / "results"
+ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026/data_processed")
+
+print("USING BACKBONE: ", BACKBONE)
+if BACKBONE == "dinov3-vit7b16-pretrain-lvd1689m":
+    CLASSIFICATION_RESULTS_DIR = Path(__file__).resolve().parent / "results"
+else:
+    CLASSIFICATION_RESULTS_DIR = Path(__file__).resolve().parent / f"results_{BACKBONE}"
+
+print("USING", CLASSIFICATION_RESULTS_DIR)
 
 
 def remap_labels_fast(train_labels: torch.Tensor, test_labels: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -99,7 +106,9 @@ def prototype_method(
     prototypes = prototypes / torch.bincount(train_labels, minlength=num_classes).unsqueeze(1)
 
     distances = pairwise_cosine_distance(test_features, prototypes)
+    top_k = min(5, num_classes)
     pred_class = distances.argmin(dim=1).cpu()
+    pred_class_top_5 = torch.topk(distances, k=top_k, dim=1, largest=False).indices.cpu()
 
     raw_data = []
     test_labels_cpu = test_labels.cpu()
@@ -117,6 +126,7 @@ def prototype_method(
     return raw_data, {
         "gt_class": test_labels_cpu,
         "pred_class": pred_class,
+        "pred_class_top_5": pred_class_top_5,
         "total_pixels": total_pixels,
         "pixel_in": pixel_in,
         "pixel_out": pixel_out,
@@ -191,7 +201,7 @@ def run_sweep(min_samples=1, max_samples=None, seeds=[], experiment_name="", mas
     for seed in tqdm(seeds, desc="Seeds", position=0):
         seed_everything(seed)
         seed_results = []
-        csv_path_prefix = f"./results/{experiment_name}/{seed}"
+        csv_path_prefix = f"{CLASSIFICATION_RESULTS_DIR}/{experiment_name}/{seed}"
         os.makedirs("/".join(csv_path_prefix.split("/")[:-1]), exist_ok=True)
 
         computed_file = None
@@ -288,5 +298,5 @@ if __name__ == "__main__":
     print(num_seeds)
     experiment_name = f"prototype_pca_white_cosine_{pca_dim}"
 
-    masks = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed/sam3_yolo_generic_mushroom_200/all/test/720/FungiTastic/test/720p"))
+    masks = load_masks(Path("/home/cavadalab/Documents/scsv/fungitastic2026/data_processed/sam3_yolo_generic_mushroom_200/all/test/720/FungiTastic/test/720p"))
     results = run_sweep(1, max_samples, seeds=num_seeds, experiment_name=experiment_name, masks=masks, pca_dim=pca_dim, save_csv=True)

@@ -11,7 +11,7 @@ from tqdm.auto import tqdm
 from rich.console import Console
 from rich.table import Table
 
-PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026_2")
+PROJECT_ROOT = Path("/home/cavadalab/Documents/scsv/fungitastic2026")
 DATASET_ROOT = Path("/data0/sebastian.cavada/datasets/FungiTastic")
 OUTPUT_ROOT = PROJECT_ROOT / "data_processed"
 MODEL_NAME = os.environ.get("MODEL_NAME", "facebook/dinov3-vit7b16-pretrain-lvd1689m")
@@ -143,8 +143,8 @@ raw_data = []
 
 for split in ["train", "val", "test"]:
 
-    PATH_SEGMENT_GENERIC = f"/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed/sam3_yolo_generic_mushroom_200/all/{split}/720/FungiTastic/{split}/720p"
-    PATH_SEGMENT_SPECIFIC = f"/home/cavadalab/Documents/scsv/fungitastic2026_2/data_processed/sam3_yolo_specific_200/all/{split}/720/FungiTastic/{split}/720p"
+    PATH_SEGMENT_GENERIC = f"/home/cavadalab/Documents/scsv/fungitastic2026/data_processed/sam3_yolo_generic_mushroom_200/all/{split}/720/FungiTastic/{split}/720p"
+    PATH_SEGMENT_SPECIFIC = f"/home/cavadalab/Documents/scsv/fungitastic2026/data_processed/sam3_yolo_specific_200/all/{split}/720/FungiTastic/{split}/720p"
 
     dataloader = get_dataloader(split)
     limit = len(dataloader)

@@ -1,0 +1,18 @@
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lcccccc|cccccc}
+\toprule
+ & \multicolumn{6}{c|}{mAcc} & \multicolumn{6}{c}{mIoU} \\
+\cmidrule(lr){2-7} \cmidrule(lr){8-13}
+ & k=5 & k=10 & k=20 & k=50 & k=100 & k=200 & k=5 & k=10 & k=20 & k=50 & k=100 & k=200 \\
+\midrule
+Norm. cosine&$0.24\pm0.01$&$0.28\pm0.01$&$0.31\pm0.01$&$0.32\pm0.00$&$0.33\pm0.00$&$0.33\pm0.00$&$0.12\pm0.01$&$0.14\pm0.01$&$0.15\pm0.00$&$0.15\pm0.00$&$0.15\pm0.00$&$0.14\pm0.00$\\
+PCA cosine&$0.23\pm0.01$&$0.27\pm0.01$&$0.30\pm0.01$&$0.32\pm0.00$&$0.32\pm0.00$&$0.32\pm0.00$&$0.12\pm0.01$&$0.13\pm0.01$&$0.14\pm0.00$&$0.14\pm0.00$&$0.14\pm0.00$&$0.14\pm0.00$\\
+PCA white cosine&$0.33\pm0.01$&$0.44\pm0.01$&$0.51\pm0.01$&$0.55\pm0.00$&$0.55\pm0.00$&$0.55\pm0.00$&$0.18\pm0.01$&$0.25\pm0.01$&$0.29\pm0.01$&$0.31\pm0.00$&$0.31\pm0.00$&$0.30\pm0.00$\\
+\bottomrule
+\end{tabular}
+\caption{Prototype results reported as mean\pm std across available seeds for different samples per class $k$.}
+\label{tab:prototype_results_mean_std}
+\end{table*}
