@@ -7,6 +7,10 @@
 **.pth
 **.pt
 
+.env
+.venv/
+.ruff_cache/
+.pytest_cache/
 __pycache__/
 data_processed/**
 classification_paper_old/**
